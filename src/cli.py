@@ -7,8 +7,8 @@ import sys
 
 import structlog
 
-from jat.config import load_settings
-from jat.clients.jules import JulesClient
+from config import load_settings
+from clients.jules import JulesClient
 
 log = structlog.get_logger()
 

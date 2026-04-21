@@ -4,8 +4,8 @@ import httpx
 import structlog
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from jat.exceptions import GitHubApiError
-from jat.models.github import CheckRun, MergeResult, PullRequest
+from exceptions import GitHubApiError
+from models.github import CheckRun, MergeResult, PullRequest
 
 log = structlog.get_logger()
 

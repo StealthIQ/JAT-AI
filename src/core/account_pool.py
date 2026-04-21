@@ -5,8 +5,8 @@ from uuid import UUID, uuid4
 
 import structlog
 
-from jat.clients.jules import JulesClient
-from jat.exceptions import AccountPoolExhausted
+from clients.jules import JulesClient
+from exceptions import AccountPoolExhausted
 
 log = structlog.get_logger()
 

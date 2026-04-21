@@ -4,8 +4,8 @@ import httpx
 import structlog
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from jat.exceptions import JulesApiError
-from jat.models.jules import Activity, Session, Source
+from exceptions import JulesApiError
+from models.jules import Activity, Session, Source
 
 log = structlog.get_logger()
 

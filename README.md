@@ -111,7 +111,7 @@ tests/
 All configuration is via environment variables or a `.env` file:
 
 | Variable | Required | Description |
-|---|---|---|
+|----------|----------|-------------|
 | JULES_API_KEY | Yes | At least one Jules API key. For multiple accounts, configure via the account pool. |
 | GITHUB_TOKEN | Yes | GitHub PAT with repo scope and merge permissions. |
 | SUPABASE_URL | Yes | Your Supabase project URL. |

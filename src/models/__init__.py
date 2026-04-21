@@ -1,4 +1,4 @@
-from jat.models.jules import (
+from models.jules import (
     Activity,
     Plan,
     PlanStep,
@@ -8,8 +8,8 @@ from jat.models.jules import (
     SessionState,
     Source,
 )
-from jat.models.workflow import AgentTask, TaskStatus, Workflow, WorkflowStatus
-from jat.models.github import CheckRun, MergeResult, PullRequest
+from models.workflow import AgentTask, TaskStatus, Workflow, WorkflowStatus
+from models.github import CheckRun, MergeResult, PullRequest
 
 __all__ = [
     "Activity",

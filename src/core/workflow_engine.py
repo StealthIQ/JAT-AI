@@ -5,10 +5,10 @@ from uuid import UUID
 
 import structlog
 
-from jat.core.coordinator import AgentCoordinator
-from jat.core.context_store import ContextStore
-from jat.exceptions import WorkflowValidationError
-from jat.models.workflow import AgentTask, TaskStatus, Workflow, WorkflowStatus
+from core.coordinator import AgentCoordinator
+from core.context_store import ContextStore
+from exceptions import WorkflowValidationError
+from models.workflow import AgentTask, TaskStatus, Workflow, WorkflowStatus
 
 log = structlog.get_logger()
 

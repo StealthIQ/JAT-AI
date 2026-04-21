@@ -5,8 +5,8 @@ from enum import StrEnum
 
 import structlog
 
-from jat.clients.github import GitHubClient
-from jat.models.github import CheckConclusion, CheckStatus, MergeResult
+from clients.github import GitHubClient
+from models.github import CheckConclusion, CheckStatus, MergeResult
 
 log = structlog.get_logger()
 

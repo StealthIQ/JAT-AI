@@ -44,6 +44,9 @@ class PullRequestOutput(BaseModel):
 
 class SessionOutput(BaseModel):
     pull_request: PullRequestOutput | None = None
+    change_set: ChangeSet | None = None
+
+    model_config = {"populate_by_name": True, "extra": "allow"}
 
 
 class SourceContext(BaseModel):
@@ -68,6 +71,8 @@ class Session(BaseModel):
     outputs: list[SessionOutput] = []
     create_time: datetime | None = None
     update_time: datetime | None = None
+
+    model_config = {"populate_by_name": True, "extra": "allow"}
 
 
 class GitPatch(BaseModel):
@@ -107,6 +112,8 @@ class Activity(BaseModel):
     session_completed: SessionCompleted | None = None
     session_failed: SessionFailed | None = None
 
+    model_config = {"populate_by_name": True, "extra": "allow"}
+
 
 class PlanGenerated(BaseModel):
     plan: Plan | None = None
@@ -142,11 +149,23 @@ class Source(BaseModel):
     id: str = ""
     github_repo: GitHubRepo | None = None
 
+    model_config = {"populate_by_name": True, "extra": "allow"}
+
+
+class GitHubBranch(BaseModel):
+    display_name: str = ""
+
+    model_config = {"populate_by_name": True, "extra": "allow"}
+
 
 class GitHubRepo(BaseModel):
     owner: str = ""
     repo: str = ""
-    private: bool = False
+    is_private: bool = False
+    default_branch: GitHubBranch | None = None
+    branches: list[GitHubBranch] = []
+
+    model_config = {"populate_by_name": True, "extra": "allow"}
 
 
 # Rebuild forward refs for models that reference types defined after them

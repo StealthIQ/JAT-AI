@@ -5,10 +5,10 @@ from uuid import UUID
 
 import structlog
 
-from jat.core.account_pool import AccountPool
-from jat.core.context_store import ContextStore
-from jat.models.workflow import AgentTask, TaskStatus
-from jat.models.jules import SessionState
+from core.account_pool import AccountPool
+from core.context_store import ContextStore
+from models.workflow import AgentTask, TaskStatus
+from models.jules import SessionState
 
 log = structlog.get_logger()
 

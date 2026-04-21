@@ -4,7 +4,7 @@ from uuid import UUID
 
 import structlog
 
-from jat.clients.supabase import SupabaseClient
+from clients.supabase import SupabaseClient
 
 log = structlog.get_logger()
 
