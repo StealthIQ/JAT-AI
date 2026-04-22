@@ -90,11 +90,15 @@ class JulesClient:
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=10))
     async def list_activities(
-        self, session_id: str, page_size: int = 50
+        self, session_id: str, page_size: int = 50, since: str | None = None
     ) -> list[Activity]:
+        params: dict = {"pageSize": page_size}
+        if since:
+            # Fetch only activities created after this timestamp (ISO 8601)
+            params["createTime"] = since
         response = await self._client.get(
             f"/sessions/{session_id}/activities",
-            params={"pageSize": page_size},
+            params=params,
         )
         self._raise_on_error(response)
         data = response.json()
