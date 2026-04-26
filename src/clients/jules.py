@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import httpx
 import structlog
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 from exceptions import JulesApiError
 from models.jules import Activity, Session, Source
@@ -13,9 +13,19 @@ JULES_BASE_URL = "https://jules.googleapis.com/v1alpha"
 DEFAULT_TIMEOUT = 30.0
 
 
+def _is_retryable(exc: BaseException) -> bool:
+    return isinstance(exc, JulesApiError) and exc.is_retryable
+
+
+_retry = retry(
+    retry=retry_if_exception(_is_retryable),
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(min=1, max=10),
+)
+
+
 class JulesClient:
     def __init__(self, api_key: str) -> None:
-        self._api_key = api_key
         self._client = httpx.AsyncClient(
             base_url=JULES_BASE_URL,
             headers={
@@ -32,7 +42,7 @@ class JulesClient:
         if response.status_code >= 400:
             raise JulesApiError(response.status_code, response.text)
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=10))
+    @_retry
     async def create_session(
         self,
         prompt: str,
@@ -56,13 +66,14 @@ class JulesClient:
         self._raise_on_error(response)
         return Session.model_validate(response.json())
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=10))
+
+    @_retry
     async def get_session(self, session_id: str) -> Session:
         response = await self._client.get(f"/sessions/{session_id}")
         self._raise_on_error(response)
         return Session.model_validate(response.json())
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=10))
+    @_retry
     async def list_sessions(self, page_size: int = 30) -> list[Session]:
         response = await self._client.get("/sessions", params={"pageSize": page_size})
         self._raise_on_error(response)
@@ -73,7 +84,7 @@ class JulesClient:
         response = await self._client.delete(f"/sessions/{session_id}")
         self._raise_on_error(response)
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=10))
+    @_retry
     async def send_message(self, session_id: str, prompt: str) -> None:
         response = await self._client.post(
             f"/sessions/{session_id}:sendMessage",
@@ -88,13 +99,12 @@ class JulesClient:
         )
         self._raise_on_error(response)
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=10))
+    @_retry
     async def list_activities(
         self, session_id: str, page_size: int = 50, since: str | None = None
     ) -> list[Activity]:
         params: dict = {"pageSize": page_size}
         if since:
-            # Fetch only activities created after this timestamp (ISO 8601)
             params["createTime"] = since
         response = await self._client.get(
             f"/sessions/{session_id}/activities",
@@ -104,17 +114,15 @@ class JulesClient:
         data = response.json()
         return [Activity.model_validate(a) for a in data.get("activities", [])]
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=10))
-    async def get_activity(
-        self, session_id: str, activity_id: str
-    ) -> Activity:
+    @_retry
+    async def get_activity(self, session_id: str, activity_id: str) -> Activity:
         response = await self._client.get(
             f"/sessions/{session_id}/activities/{activity_id}"
         )
         self._raise_on_error(response)
         return Activity.model_validate(response.json())
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=10))
+    @_retry
     async def list_sources(self, page_size: int = 100) -> list[Source]:
         response = await self._client.get("/sources", params={"pageSize": page_size})
         self._raise_on_error(response)

@@ -8,12 +8,20 @@ class JulesApiError(JatError):
         self.message = message
         super().__init__(f"Jules API {status_code}: {message}")
 
+    @property
+    def is_retryable(self) -> bool:
+        return self.status_code >= 500 or self.status_code == 429
+
 
 class GitHubApiError(JatError):
     def __init__(self, status_code: int, message: str) -> None:
         self.status_code = status_code
         self.message = message
         super().__init__(f"GitHub API {status_code}: {message}")
+
+    @property
+    def is_retryable(self) -> bool:
+        return self.status_code >= 500 or self.status_code == 429
 
 
 class AccountPoolExhausted(JatError):
@@ -25,4 +33,12 @@ class WorkflowValidationError(JatError):
 
 
 class DependencyTimeoutError(JatError):
+    pass
+
+
+class SessionTimeoutError(JatError):
+    pass
+
+
+class MergeFailedError(JatError):
     pass

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import httpx
 import structlog
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 from exceptions import GitHubApiError
 from models.github import CheckRun, MergeResult, PullRequest
@@ -11,6 +11,17 @@ log = structlog.get_logger()
 
 GITHUB_API_URL = "https://api.github.com"
 DEFAULT_TIMEOUT = 30.0
+
+
+def _is_retryable(exc: BaseException) -> bool:
+    return isinstance(exc, GitHubApiError) and exc.is_retryable
+
+
+_retry = retry(
+    retry=retry_if_exception(_is_retryable),
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(min=1, max=10),
+)
 
 
 class GitHubClient:
@@ -31,7 +42,7 @@ class GitHubClient:
         if response.status_code >= 400:
             raise GitHubApiError(response.status_code, response.text)
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=10))
+    @_retry
     async def get_pull_request(
         self, owner: str, repo: str, pr_number: int
     ) -> PullRequest:
@@ -51,7 +62,7 @@ class GitHubClient:
             merged=data.get("merged", False),
         )
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=10))
+    @_retry
     async def list_check_runs(
         self, owner: str, repo: str, ref: str
     ) -> list[CheckRun]:
@@ -94,7 +105,7 @@ class GitHubClient:
             message=data.get("message", ""),
         )
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=10))
+    @_retry
     async def list_pr_comments(
         self, owner: str, repo: str, pr_number: int
     ) -> list[dict]:
