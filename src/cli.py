@@ -45,6 +45,12 @@ def build_parser() -> argparse.ArgumentParser:
     activities_cmd.add_argument("session_id")
     activities_cmd.add_argument("--api-key", help="Jules API key (overrides env)")
 
+    wf_cmd = sub.add_parser("workflow", help="Run a multi-task workflow from a JSON file")
+    wf_cmd.add_argument("file", help="Path to workflow JSON file")
+    wf_cmd.add_argument("--api-key", help="Jules API key (overrides env)")
+    wf_cmd.add_argument("--auto-merge", action="store_true")
+    wf_cmd.add_argument("--merge-strategy", default="squash", choices=["squash", "merge", "rebase"])
+
     return parser
 
 
@@ -122,6 +128,79 @@ async def run_activities(api_key: str, session_id: str) -> None:
         await client.close()
 
 
+async def run_workflow(settings, api_key: str, args) -> None:
+    import json as json_mod
+    from core.account_pool import AccountPool, Account, PlanTier
+    from core.context_store import ContextStore
+    from core.coordinator import AgentCoordinator
+    from core.workflow_engine import WorkflowEngine
+
+    with open(args.file) as f:
+        data = json_mod.load(f)
+
+    pool = AccountPool()
+    pool.add_account(Account(name="default", api_key=api_key, plan=PlanTier.ULTRA))
+
+    db = SupabaseClient(settings.supabase_url, settings.supabase_key)
+    store = ContextStore(db)
+    coordinator = AgentCoordinator(pool, store)
+    engine = WorkflowEngine(coordinator, store)
+
+    workflow = _build_workflow(data, settings)
+
+    log.info("workflow_starting", name=workflow.name, task_count=len(workflow.tasks))
+    result = await engine.run(workflow)
+    log.info("workflow_done", status=result.status)
+
+    _print_workflow_result(result)
+    await pool.close_all()
+
+
+def _build_workflow(data: dict, settings) -> "Workflow":
+    from uuid import UUID
+    from models.workflow import AgentTask, Workflow
+
+    tasks = []
+    id_map: dict[str, UUID] = {}
+
+    for t in data.get("tasks", []):
+        task = AgentTask(
+            prompt=t["prompt"],
+            repo_owner=t.get("owner", settings.default_repo_owner),
+            repo_name=t.get("repo", settings.default_repo_name),
+            branch=t.get("branch", "main"),
+        )
+        id_map[t.get("name", str(task.id))] = task.id
+        tasks.append((task, t.get("depends_on", [])))
+
+    for task, dep_names in tasks:
+        task.depends_on = [id_map[name] for name in dep_names if name in id_map]
+
+    return Workflow(
+        name=data.get("name", "workflow"),
+        description=data.get("description", ""),
+        tasks=[t for t, _ in tasks],
+    )
+
+
+def _print_workflow_result(result) -> None:
+    import json as json_mod
+    print(json_mod.dumps({
+        "workflow_id": str(result.id),
+        "status": result.status,
+        "tasks": [
+            {
+                "id": str(t.id),
+                "prompt": t.prompt[:60],
+                "status": t.status,
+                "pr_url": t.pr_url,
+                "error": t.error,
+            }
+            for t in result.tasks
+        ],
+    }, indent=2))
+
+
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
@@ -147,6 +226,8 @@ def main() -> None:
         asyncio.run(run_status(api_key, args.session_id))
     elif args.command == "activities":
         asyncio.run(run_activities(api_key, args.session_id))
+    elif args.command == "workflow":
+        asyncio.run(run_workflow(settings, api_key, args))
 
 
 if __name__ == "__main__":

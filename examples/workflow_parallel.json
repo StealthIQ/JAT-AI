@@ -1,0 +1,28 @@
+{
+  "name": "parallel-review",
+  "description": "Review two repos in parallel, then create a summary",
+  "tasks": [
+    {
+      "name": "review-frontend",
+      "prompt": "Review the codebase for code quality issues and create a REVIEW.md with findings.",
+      "owner": "iceyxsm",
+      "repo": "Abhiacharyaji",
+      "branch": "master"
+    },
+    {
+      "name": "review-api",
+      "prompt": "Review the codebase for code quality issues and create a REVIEW.md with findings.",
+      "owner": "iceyxsm",
+      "repo": "AnyWebApi",
+      "branch": "main"
+    },
+    {
+      "name": "summary",
+      "prompt": "Based on the reviews from the dependent tasks, create a consolidated IMPROVEMENTS.md with prioritized action items.",
+      "owner": "iceyxsm",
+      "repo": "Abhiacharyaji",
+      "branch": "master",
+      "depends_on": ["review-frontend", "review-api"]
+    }
+  ]
+}
