@@ -7,7 +7,7 @@ import sys
 
 import structlog
 
-from config import load_settings
+from config import load_settings, configure_logging
 from clients.jules import JulesClient
 from clients.github import GitHubClient
 from clients.supabase import SupabaseClient
@@ -210,6 +210,7 @@ def main() -> None:
         sys.exit(1)
 
     settings = load_settings()
+    configure_logging(settings.log_level)
     api_key = getattr(args, "api_key", None) or settings.jules_api_key
 
     if not api_key:

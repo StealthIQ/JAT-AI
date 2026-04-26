@@ -1,9 +1,25 @@
+import logging
+import re
+
+import structlog
 from pydantic_settings import BaseSettings
+
+SECRET_PATTERN = re.compile(
+    r"(AQ\.[A-Za-z0-9_-]{10,}|ghp_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|sb_[A-Za-z0-9_]{20,})"
+)
+
+
+def _mask_secrets(_, __, event_dict: dict) -> dict:
+    for key, value in event_dict.items():
+        if isinstance(value, str):
+            event_dict[key] = SECRET_PATTERN.sub("[MASKED]", value)
+    return event_dict
 
 
 class Settings(BaseSettings):
     jules_api_key: str = ""
     github_token: str = ""
+    github_fg_token: str = ""
     supabase_url: str = ""
     supabase_key: str = ""
     default_repo_owner: str = ""
@@ -15,3 +31,18 @@ class Settings(BaseSettings):
 
 def load_settings() -> Settings:
     return Settings()
+
+
+def configure_logging(level: str = "INFO") -> None:
+    structlog.configure(
+        processors=[
+            structlog.contextvars.merge_contextvars,
+            structlog.processors.add_log_level,
+            structlog.processors.TimeStamper(fmt="iso"),
+            _mask_secrets,
+            structlog.dev.ConsoleRenderer(),
+        ],
+        wrapper_class=structlog.make_filtering_bound_logger(
+            getattr(logging, level.upper(), logging.INFO)
+        ),
+    )

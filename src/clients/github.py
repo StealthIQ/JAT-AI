@@ -39,8 +39,15 @@ class GitHubClient:
         await self._client.aclose()
 
     def _raise_on_error(self, response: httpx.Response) -> None:
+        self._check_rate_limit(response)
         if response.status_code >= 400:
             raise GitHubApiError(response.status_code, response.text)
+
+    def _check_rate_limit(self, response: httpx.Response) -> None:
+        remaining = response.headers.get("x-ratelimit-remaining")
+        if remaining is not None and int(remaining) < 10:
+            reset = response.headers.get("x-ratelimit-reset", "unknown")
+            log.warning("rate_limit_low", remaining=remaining, reset_at=reset)
 
     @_retry
     async def get_pull_request(
