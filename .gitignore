@@ -1,3 +1,7 @@
 .kiro
 tests/
 .env
+__pycache__/
+*.pyc
+_*.py
+_*.txt
