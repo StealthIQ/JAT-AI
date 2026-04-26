@@ -9,6 +9,7 @@ import structlog
 
 from config import load_settings
 from clients.jules import JulesClient
+from clients.github import GitHubClient
 from clients.supabase import SupabaseClient
 from core.session_runner import run_session
 
@@ -26,6 +27,8 @@ def build_parser() -> argparse.ArgumentParser:
     run_cmd.add_argument("--branch", default="main")
     run_cmd.add_argument("--title", default="")
     run_cmd.add_argument("--api-key", help="Jules API key (overrides env)")
+    run_cmd.add_argument("--auto-merge", action="store_true", help="Auto-merge PR after CI passes")
+    run_cmd.add_argument("--merge-strategy", default="squash", choices=["squash", "merge", "rebase"])
 
     list_cmd = sub.add_parser("list-sessions", help="List Jules sessions")
     list_cmd.add_argument("--api-key", help="Jules API key (overrides env)")
@@ -57,6 +60,10 @@ async def run_task(settings, api_key: str, args) -> None:
     jules = JulesClient(api_key)
     db = SupabaseClient(settings.supabase_url, settings.supabase_key)
 
+    github = None
+    if args.auto_merge and settings.github_token:
+        github = GitHubClient(settings.github_token)
+
     try:
         result = await run_session(
             jules=jules,
@@ -65,10 +72,15 @@ async def run_task(settings, api_key: str, args) -> None:
             source=source,
             branch=args.branch,
             title=args.title,
+            github=github,
+            auto_merge=args.auto_merge,
+            merge_strategy=args.merge_strategy,
         )
         print(json.dumps(result, indent=2))
     finally:
         await jules.close()
+        if github:
+            await github.close()
 
 
 async def run_list_sessions(api_key: str, limit: int) -> None:

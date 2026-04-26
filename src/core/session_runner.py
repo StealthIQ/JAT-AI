@@ -6,7 +6,9 @@ from datetime import datetime, timezone
 import structlog
 
 from clients.jules import JulesClient
+from clients.github import GitHubClient
 from clients.supabase import SupabaseClient
+from core.auto_merge import AutoMerge, MergeStrategy
 from models.jules import SessionState
 
 log = structlog.get_logger()
@@ -23,6 +25,9 @@ async def run_session(
     branch: str = "main",
     title: str = "",
     task_id: str | None = None,
+    github: GitHubClient | None = None,
+    auto_merge: bool = False,
+    merge_strategy: str = "squash",
 ) -> dict:
     session_title = title or prompt[:80]
 
@@ -42,6 +47,42 @@ async def run_session(
         )
 
     result = await _poll_until_done(jules, db, session.id, task_id)
+
+    if auto_merge and github and result["pr_url"]:
+        result = await _try_auto_merge(github, db, result, source, merge_strategy)
+
+    return result
+
+
+async def _try_auto_merge(
+    github: GitHubClient,
+    db: SupabaseClient,
+    result: dict,
+    source: str,
+    merge_strategy: str,
+) -> dict:
+    pr_url = result["pr_url"]
+    # Extract owner, repo, and PR number from the URL
+    # Format: https://github.com/{owner}/{repo}/pull/{number}
+    parts = pr_url.rstrip("/").split("/")
+    owner, repo, pr_number = parts[-4], parts[-3], int(parts[-1])
+
+    log.info("auto_merge_starting", owner=owner, repo=repo, pr=pr_number)
+
+    strategy = MergeStrategy(merge_strategy)
+    merger = AutoMerge(github, strategy=strategy)
+
+    try:
+        merge_result = await merger.merge_when_ready(owner, repo, pr_number)
+        result["merged"] = merge_result.merged
+        result["merge_sha"] = merge_result.sha
+        result["merge_message"] = merge_result.message
+        log.info("auto_merge_done", merged=merge_result.merged, sha=merge_result.sha)
+    except Exception as exc:
+        result["merged"] = False
+        result["merge_error"] = str(exc)
+        log.error("auto_merge_failed", error=str(exc))
+
     return result
 
 
@@ -76,7 +117,7 @@ async def _poll_until_done(
         if session.state == SessionState.FAILED:
             return _build_result(session, "failed")
 
-        if session.state in (SessionState.PAUSED,):
+        if session.state == SessionState.PAUSED:
             return _build_result(session, "paused")
 
         await asyncio.sleep(POLL_INTERVAL)
@@ -117,6 +158,11 @@ def _log_activity(activity) -> None:
     if activity.plan_generated and activity.plan_generated.plan:
         steps = activity.plan_generated.plan.steps
         parts.append(f"Plan with {len(steps)} steps")
+        for step in steps:
+            parts.append(f"  - {step.title}")
+
+    if activity.session_failed:
+        parts.append(f"FAILED: {activity.session_failed.reason}")
 
     log.info("activity", detail=" | ".join(parts))
 
