@@ -3,7 +3,12 @@ from __future__ import annotations
 from datetime import datetime
 from enum import StrEnum
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
+
+
+def to_camel(name: str) -> str:
+    parts = name.split("_")
+    return parts[0] + "".join(w.capitalize() for w in parts[1:])
 
 
 class SessionState(StrEnum):
@@ -23,42 +28,54 @@ class AutomationMode(StrEnum):
     AUTO_CREATE_PR = "AUTO_CREATE_PR"
 
 
+CAMEL_CONFIG = ConfigDict(
+    alias_generator=to_camel,
+    populate_by_name=True,
+    extra="allow",
+)
+
+
 class PlanStep(BaseModel):
+    model_config = CAMEL_CONFIG
     id: str
-    index: int
+    index: int = 0
     title: str
     description: str = ""
 
 
 class Plan(BaseModel):
+    model_config = CAMEL_CONFIG
     id: str
     steps: list[PlanStep] = []
     create_time: datetime | None = None
 
 
 class PullRequestOutput(BaseModel):
+    model_config = CAMEL_CONFIG
     url: str
     title: str
     description: str = ""
 
 
 class SessionOutput(BaseModel):
+    model_config = CAMEL_CONFIG
     pull_request: PullRequestOutput | None = None
     change_set: ChangeSet | None = None
 
-    model_config = {"populate_by_name": True, "extra": "allow"}
-
 
 class SourceContext(BaseModel):
+    model_config = CAMEL_CONFIG
     source: str
     github_repo_context: GitHubRepoContext | None = None
 
 
 class GitHubRepoContext(BaseModel):
+    model_config = CAMEL_CONFIG
     starting_branch: str = "main"
 
 
 class Session(BaseModel):
+    model_config = CAMEL_CONFIG
     name: str = ""
     id: str = ""
     prompt: str = ""
@@ -72,32 +89,35 @@ class Session(BaseModel):
     create_time: datetime | None = None
     update_time: datetime | None = None
 
-    model_config = {"populate_by_name": True, "extra": "allow"}
-
 
 class GitPatch(BaseModel):
+    model_config = CAMEL_CONFIG
     base_commit_id: str = ""
     unidiff_patch: str = ""
     suggested_commit_message: str = ""
 
 
 class ChangeSet(BaseModel):
+    model_config = CAMEL_CONFIG
     source: str = ""
     git_patch: GitPatch | None = None
 
 
 class BashOutput(BaseModel):
+    model_config = CAMEL_CONFIG
     command: str = ""
     output: str = ""
     exit_code: int = 0
 
 
 class Artifact(BaseModel):
+    model_config = CAMEL_CONFIG
     change_set: ChangeSet | None = None
     bash_output: BashOutput | None = None
 
 
 class Activity(BaseModel):
+    model_config = CAMEL_CONFIG
     name: str = ""
     id: str = ""
     originator: str = ""
@@ -112,60 +132,61 @@ class Activity(BaseModel):
     session_completed: SessionCompleted | None = None
     session_failed: SessionFailed | None = None
 
-    model_config = {"populate_by_name": True, "extra": "allow"}
-
 
 class PlanGenerated(BaseModel):
+    model_config = CAMEL_CONFIG
     plan: Plan | None = None
 
 
 class PlanApproved(BaseModel):
+    model_config = CAMEL_CONFIG
     plan_id: str = ""
 
 
 class UserMessaged(BaseModel):
+    model_config = CAMEL_CONFIG
     user_message: str = ""
 
 
 class AgentMessaged(BaseModel):
+    model_config = CAMEL_CONFIG
     agent_message: str = ""
 
 
 class ProgressUpdated(BaseModel):
+    model_config = CAMEL_CONFIG
     title: str = ""
     description: str = ""
 
 
 class SessionCompleted(BaseModel):
-    pass
+    model_config = CAMEL_CONFIG
 
 
 class SessionFailed(BaseModel):
+    model_config = CAMEL_CONFIG
     reason: str = ""
 
 
 class Source(BaseModel):
+    model_config = CAMEL_CONFIG
     name: str = ""
     id: str = ""
     github_repo: GitHubRepo | None = None
 
-    model_config = {"populate_by_name": True, "extra": "allow"}
-
 
 class GitHubBranch(BaseModel):
+    model_config = CAMEL_CONFIG
     display_name: str = ""
-
-    model_config = {"populate_by_name": True, "extra": "allow"}
 
 
 class GitHubRepo(BaseModel):
+    model_config = CAMEL_CONFIG
     owner: str = ""
     repo: str = ""
     is_private: bool = False
     default_branch: GitHubBranch | None = None
     branches: list[GitHubBranch] = []
-
-    model_config = {"populate_by_name": True, "extra": "allow"}
 
 
 # Rebuild forward refs for models that reference types defined after them

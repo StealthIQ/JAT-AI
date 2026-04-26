@@ -58,7 +58,11 @@ async def _poll_until_done(
         session = await jules.get_session(session_id)
         log.info("session_poll", session_id=session_id, state=session.state)
 
-        activities = await jules.list_activities(session_id, since=last_activity_time)
+        try:
+            activities = await jules.list_activities(session_id, since=last_activity_time)
+        except Exception:
+            activities = []
+
         for activity in activities:
             _log_activity(activity)
             if task_id:

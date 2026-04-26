@@ -103,3 +103,32 @@ class GitHubClient:
         )
         self._raise_on_error(response)
         return response.json()
+
+    async def create_repo(
+        self,
+        name: str,
+        private: bool = True,
+        description: str = "",
+        auto_init: bool = True,
+    ) -> dict:
+        payload: dict = {
+            "name": name,
+            "private": private,
+            "auto_init": auto_init,
+        }
+        if description:
+            payload["description"] = description
+
+        response = await self._client.post("/user/repos", json=payload)
+        self._raise_on_error(response)
+        data = response.json()
+        return {
+            "id": data["id"],
+            "full_name": data["full_name"],
+            "owner": data["owner"]["login"],
+            "name": data["name"],
+            "html_url": data["html_url"],
+            "private": data["private"],
+            "default_branch": data.get("default_branch", "main"),
+            "source": f"sources/github/{data['owner']['login']}/{data['name']}",
+        }
