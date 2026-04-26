@@ -8,6 +8,8 @@ from clients.supabase import SupabaseClient
 
 log = structlog.get_logger()
 
+MAX_CONTEXT_CHARS = 4000
+
 
 class ContextStore:
     def __init__(self, supabase: SupabaseClient) -> None:
@@ -20,24 +22,23 @@ class ContextStore:
         rows = await self._db.select("agent_tasks", filters={"id": str(task_id)})
         return rows[0] if rows else {}
 
-    async def save_context(self, task_id: UUID, context: dict) -> None:
+    async def save_result(self, task_id: UUID, result: dict) -> None:
         await self._db.upsert(
             "context_messages",
-            {"task_id": str(task_id), "context": context},
+            {
+                "task_id": str(task_id),
+                "context": _trim_context(result),
+            },
         )
 
-    async def get_context(self, task_id: UUID) -> dict:
-        rows = await self._db.select(
-            "context_messages", filters={"task_id": str(task_id)}
-        )
-        return rows[0].get("context", {}) if rows else {}
-
-    async def get_task_results(self, task_ids: list[UUID]) -> list[dict]:
+    async def get_dependency_context(self, dep_task_ids: list[UUID]) -> list[dict]:
         results = []
-        for task_id in task_ids:
-            state = await self.get_task_state(task_id)
-            if state:
-                results.append(state)
+        for tid in dep_task_ids:
+            rows = await self._db.select(
+                "context_messages", filters={"task_id": str(tid)}
+            )
+            if rows:
+                results.append(rows[0].get("context", {}))
         return results
 
     async def publish_message(
@@ -56,3 +57,12 @@ class ContextStore:
         return await self._db.select(
             "context_messages", filters={"to_task_id": str(task_id)}
         )
+
+
+def _trim_context(result: dict) -> dict:
+    # Jules prompts have size limits; truncate large fields to stay under budget
+    trimmed = dict(result)
+    for key in ("activities_summary", "summary"):
+        if key in trimmed and len(str(trimmed[key])) > MAX_CONTEXT_CHARS:
+            trimmed[key] = str(trimmed[key])[:MAX_CONTEXT_CHARS] + "...[trimmed]"
+    return trimmed

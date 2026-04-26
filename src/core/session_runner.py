@@ -9,6 +9,7 @@ from clients.jules import JulesClient
 from clients.github import GitHubClient
 from clients.supabase import SupabaseClient
 from core.auto_merge import AutoMerge, MergeStrategy
+from core.context_store import ContextStore
 from models.jules import SessionState
 
 log = structlog.get_logger()
@@ -47,6 +48,10 @@ async def run_session(
         )
 
     result = await _poll_until_done(jules, db, session.id, task_id)
+
+    if task_id:
+        store = ContextStore(db)
+        await store.save_result(task_id, result)
 
     if auto_merge and github and result["pr_url"]:
         result = await _try_auto_merge(github, db, result, source, merge_strategy)

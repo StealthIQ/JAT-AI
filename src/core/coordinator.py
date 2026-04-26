@@ -57,11 +57,8 @@ class AgentCoordinator:
 
             prompt = task.prompt
             if dep_results:
-                context_summary = "\n".join(
-                    f"- {r.get('prompt', 'task')}: {r.get('status', 'unknown')}, PR: {r.get('pr_url', 'none')}"
-                    for r in dep_results
-                )
-                prompt = f"{task.prompt}\n\nContext from dependencies:\n{context_summary}"
+                dep_contexts = await self._store.get_dependency_context(task.depends_on)
+                prompt = _build_prompt_with_context(task.prompt, dep_results, dep_contexts)
 
             session = await client.create_session(
                 prompt=prompt,
@@ -79,6 +76,13 @@ class AgentCoordinator:
             log.error("task_failed", task_id=str(task.id), error=str(exc))
         finally:
             self._pool.release(account.id)
+            result_context = {
+                "prompt": task.prompt[:200],
+                "status": task.status,
+                "pr_url": task.pr_url,
+                "error": task.error,
+            }
+            await self._store.save_result(task.id, result_context)
             await self._store.save_task_state(task.id, task.model_dump(mode="json"))
             event = self._get_or_create_event(task.id)
             event.set()
@@ -112,3 +116,32 @@ class AgentCoordinator:
         task.status = TaskStatus.FAILED
         task.error = "Session timed out"
         return task
+
+
+def _build_prompt_with_context(
+    base_prompt: str, dep_results: list[dict], dep_contexts: list[dict]
+) -> str:
+    lines = [base_prompt, "", "Context from completed dependencies:"]
+
+    for i, ctx in enumerate(dep_contexts):
+        task_label = ctx.get("prompt", f"dependency {i + 1}")[:80]
+        status = ctx.get("status", "unknown")
+        pr_url = ctx.get("pr_url", "none")
+        error = ctx.get("error", "")
+
+        entry = f"- [{status}] {task_label}"
+        if pr_url:
+            entry += f" | PR: {pr_url}"
+        if error:
+            entry += f" | Error: {error}"
+        lines.append(entry)
+
+    # Fall back to task state if no saved context exists for some deps
+    if len(dep_contexts) < len(dep_results):
+        for r in dep_results[len(dep_contexts):]:
+            lines.append(
+                f"- {r.get('prompt', 'task')}: {r.get('status', 'unknown')}"
+                f", PR: {r.get('pr_url', 'none')}"
+            )
+
+    return "\n".join(lines)
