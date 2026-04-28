@@ -10,6 +10,7 @@ from clients.github import GitHubClient
 from clients.supabase import SupabaseClient
 from core.auto_merge import AutoMerge, MergeStrategy
 from core.context_store import ContextStore
+from core.prompt_builder import build_session_prompt
 from models.jules import SessionState
 
 log = structlog.get_logger()
@@ -29,11 +30,13 @@ async def run_session(
     github: GitHubClient | None = None,
     auto_merge: bool = False,
     merge_strategy: str = "squash",
+    dependency_context: list[dict] | None = None,
 ) -> dict:
     session_title = title or prompt[:80]
+    full_prompt = build_session_prompt(prompt, dependency_context)
 
     session = await jules.create_session(
-        prompt=prompt,
+        prompt=full_prompt,
         source=source,
         branch=branch,
         title=session_title,

@@ -51,6 +51,36 @@ def build_parser() -> argparse.ArgumentParser:
     wf_cmd.add_argument("--auto-merge", action="store_true")
     wf_cmd.add_argument("--merge-strategy", default="squash", choices=["squash", "merge", "rebase"])
 
+    prov_cmd = sub.add_parser("providers", help="Manage AI providers")
+    prov_sub = prov_cmd.add_subparsers(dest="prov_action")
+    prov_add = prov_sub.add_parser("add", help="Add a provider account")
+    prov_add.add_argument("--type", required=True, choices=["groq", "google", "cloudflare", "openrouter", "ollama"])
+    prov_add.add_argument("--name", required=True)
+    prov_add.add_argument("--key", default="")
+    prov_add.add_argument("--model", default="")
+    prov_add.add_argument("--base-url", default="")
+    prov_add.add_argument("--daily-limit", type=int, default=0)
+    prov_sub.add_parser("list", help="List all providers")
+    prov_rm = prov_sub.add_parser("remove", help="Remove a provider")
+    prov_rm.add_argument("id", help="Provider ID to remove")
+
+    chat_cmd = sub.add_parser("chat", help="Start or continue a conversation")
+    chat_cmd.add_argument("--provider", required=True, help="Provider name")
+    chat_cmd.add_argument("--model", default="")
+    chat_cmd.add_argument("--mode", default="plan", choices=["plan", "direct"])
+    chat_cmd.add_argument("--template", default="custom")
+    chat_cmd.add_argument("--owner", default="")
+    chat_cmd.add_argument("--repo", default="")
+    chat_cmd.add_argument("--conversation-id", default="", help="Continue existing conversation")
+    chat_cmd.add_argument("message", nargs="?", default="")
+
+    tmpl_cmd = sub.add_parser("templates", help="List available prompt templates")
+
+    decompose_cmd = sub.add_parser("decompose", help="Decompose a task into agent specs")
+    decompose_cmd.add_argument("--provider", required=True, help="Provider name for AI")
+    decompose_cmd.add_argument("--task", required=True, help="Task description")
+    decompose_cmd.add_argument("--context", default="", help="Optional repo context file")
+
     return parser
 
 
@@ -229,6 +259,18 @@ def main() -> None:
         asyncio.run(run_activities(api_key, args.session_id))
     elif args.command == "workflow":
         asyncio.run(run_workflow(settings, api_key, args))
+    elif args.command == "providers":
+        from cli_ai import run_providers
+        asyncio.run(run_providers(settings, args))
+    elif args.command == "chat":
+        from cli_ai import run_chat
+        asyncio.run(run_chat(settings, args))
+    elif args.command == "templates":
+        from cli_ai import run_templates
+        asyncio.run(run_templates())
+    elif args.command == "decompose":
+        from cli_ai import run_decompose
+        asyncio.run(run_decompose(settings, args))
 
 
 if __name__ == "__main__":

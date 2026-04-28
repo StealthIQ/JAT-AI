@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     github_fg_token: str = ""
     supabase_url: str = ""
     supabase_key: str = ""
+    encryption_key: str = ""
     default_repo_owner: str = ""
     default_repo_name: str = ""
     log_level: str = "INFO"

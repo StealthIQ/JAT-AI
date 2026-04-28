@@ -4,7 +4,10 @@ tests/
 ui/.env
 ui/node_modules/
 ui/dist/
+config.json
+.cache/
 __pycache__/
 *.pyc
 _*.py
 _*.txt
+ui

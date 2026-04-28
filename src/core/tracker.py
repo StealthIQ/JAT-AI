@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Callable
 from uuid import UUID
 
@@ -9,17 +10,58 @@ from clients.supabase import SupabaseClient
 
 log = structlog.get_logger()
 
+# Sessions with no activity for this long are considered stale
+STALE_THRESHOLD_SECONDS = 600
+
+
+class MonitorConfig:
+    def __init__(
+        self,
+        poll_interval: int = 15,
+        stale_threshold: int = STALE_THRESHOLD_SECONDS,
+        max_cached_activities: int = 200,
+    ) -> None:
+        self.poll_interval = poll_interval
+        self.stale_threshold = stale_threshold
+        self.max_cached_activities = max_cached_activities
+
 
 class Tracker:
-    def __init__(self, supabase: SupabaseClient) -> None:
+    def __init__(
+        self, supabase: SupabaseClient, config: MonitorConfig | None = None
+    ) -> None:
         self._db = supabase
+        self._config = config or MonitorConfig()
         self._channels: list = []
+        self._activity_cache: list[dict] = []
+        self._last_fetch: datetime | None = None
+
+    @property
+    def is_stale(self) -> bool:
+        if not self._last_fetch:
+            return True
+        elapsed = (datetime.now(timezone.utc) - self._last_fetch).total_seconds()
+        return elapsed > self._config.stale_threshold
 
     async def get_active_tasks(self) -> list[dict]:
         return await self._db.select(
             "agent_tasks",
             filters={"status": "running"},
         )
+
+    async def get_stale_tasks(self) -> list[dict]:
+        running = await self.get_active_tasks()
+        stale = []
+        now = datetime.now(timezone.utc)
+        for task in running:
+            updated = task.get("updated_at") or task.get("created_at")
+            if not updated:
+                stale.append(task)
+                continue
+            age = (now - datetime.fromisoformat(updated)).total_seconds()
+            if age > self._config.stale_threshold:
+                stale.append(task)
+        return stale
 
     async def get_workflow_status(self, workflow_id: UUID) -> dict:
         tasks = await self._db.select(
@@ -37,6 +79,13 @@ class Tracker:
             "by_status": by_status,
             "tasks": tasks,
         }
+
+    async def get_recent_activities(self, limit: int = 50) -> list[dict]:
+        rows = await self._db.select("session_activities")
+        rows.sort(key=lambda r: r.get("created_at", ""), reverse=True)
+        self._activity_cache = rows[: self._config.max_cached_activities]
+        self._last_fetch = datetime.now(timezone.utc)
+        return rows[:limit]
 
     async def subscribe_task_updates(
         self, callback: Callable[[dict], None]
