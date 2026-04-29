@@ -20,38 +20,96 @@ class ProviderType(StrEnum):
     GOOGLE = "google"
     OPENROUTER = "openrouter"
     OLLAMA = "ollama"
+    CEREBRAS = "cerebras"
+    COHERE = "cohere"
+    MISTRAL = "mistral"
+    NVIDIA_NIM = "nvidia_nim"
+    GITHUB_MODELS = "github_models"
+    HUGGINGFACE = "huggingface"
+    SAMBANOVA = "sambanova"
+    FIREWORKS = "fireworks"
+    NEBIUS = "nebius"
+    HYPERBOLIC = "hyperbolic"
+    SCALEWAY = "scaleway"
 
 
 # Verified free tier limits as of April 2026
 PROVIDER_LIMITS = {
     ProviderType.CLOUDFLARE: {
         "daily_neurons": 10000,
-        "rpm": 0,
         "notes": "10K neurons/day free. Beta models unlimited.",
     },
     ProviderType.GROQ: {
         "models": {
-            "llama-3.1-8b-instant": {"rpm": 30, "rpd": 14400, "tpm": 6000, "tpd": 500000},
-            "llama-3.3-70b-versatile": {"rpm": 30, "rpd": 1000, "tpm": 12000, "tpd": 100000},
-            "llama-4-scout-17b-16e-instruct": {"rpm": 30, "rpd": 1000, "tpm": 30000, "tpd": 500000},
+            "llama-3.1-8b-instant": {"rpm": 30, "rpd": 14400, "tpm": 6000},
+            "llama-3.3-70b-versatile": {"rpm": 30, "rpd": 1000, "tpm": 12000},
+            "llama-4-scout-17b-16e-instruct": {"rpm": 30, "rpd": 1000, "tpm": 30000},
+            "openai/gpt-oss-120b": {"rpm": 30, "rpd": 1000, "tpm": 8000},
+            "qwen/qwen3-32b": {"rpm": 30, "rpd": 1000, "tpm": 6000},
         },
-        "notes": "Per-org limits. No credit card needed.",
     },
     ProviderType.GOOGLE: {
         "models": {
-            "gemini-2.5-flash": {"rpm": 10, "rpd": 250, "tpm": 250000},
-            "gemini-2.5-flash-lite": {"rpm": 30, "rpd": 1000, "tpm": 250000},
-            "gemini-1.5-flash": {"rpm": 15, "rpd": 1000, "tpm": 250000},
+            "gemini-3-flash": {"rpm": 5, "rpd": 20, "tpm": 250000},
+            "gemini-3.1-flash-lite": {"rpm": 15, "rpd": 500, "tpm": 250000},
+            "gemini-2.5-flash": {"rpm": 5, "rpd": 20, "tpm": 250000},
+            "gemini-2.5-flash-lite": {"rpm": 10, "rpd": 20, "tpm": 250000},
+            "gemma-3-27b-it": {"rpm": 30, "rpd": 14400, "tpm": 15000},
+            "gemma-3-12b-it": {"rpm": 30, "rpd": 14400, "tpm": 15000},
         },
-        "notes": "Per-project limits. Multiple API keys share one quota per project.",
     },
     ProviderType.OPENROUTER: {
-        "free_no_credits": {"rpd": 50, "rpm": 20},
-        "with_10_credits": {"rpd": 1000, "rpm": 20},
-        "notes": "Free models end with :free. $10 deposit unlocks 1000 rpd.",
+        "rpm": 20, "rpd": 50,
+        "with_10_topup": {"rpd": 1000},
+        "notes": "Free models end with :free. $10 lifetime topup unlocks 1000 rpd.",
     },
     ProviderType.OLLAMA: {
         "notes": "Local. No limits. Requires GPU.",
+    },
+    ProviderType.CEREBRAS: {
+        "models": {
+            "gpt-oss-120b": {"rpm": 30, "rpd": 14400, "tpm": 60000},
+            "llama-3.1-8b": {"rpm": 30, "rpd": 14400, "tpm": 60000},
+        },
+    },
+    ProviderType.COHERE: {
+        "rpm": 20, "requests_per_month": 1000,
+        "notes": "All models share a common monthly quota.",
+    },
+    ProviderType.MISTRAL: {
+        "rps": 1, "tpm": 500000, "tokens_per_month": 1000000000,
+        "notes": "Free tier requires opting into data training. Phone verification required.",
+    },
+    ProviderType.NVIDIA_NIM: {
+        "rpm": 40,
+        "notes": "Phone verification required. Context windows may be limited.",
+    },
+    ProviderType.GITHUB_MODELS: {
+        "notes": "Limits depend on Copilot tier. Restrictive input/output token limits.",
+    },
+    ProviderType.HUGGINGFACE: {
+        "monthly_credits_usd": 0.10,
+        "notes": "Serverless inference limited to models under 10GB.",
+    },
+    ProviderType.SAMBANOVA: {
+        "credits_usd": 5, "credits_duration_months": 3,
+        "notes": "Trial credits. Fast inference.",
+    },
+    ProviderType.FIREWORKS: {
+        "credits_usd": 1,
+        "notes": "Trial credits.",
+    },
+    ProviderType.NEBIUS: {
+        "credits_usd": 1,
+        "notes": "Trial credits.",
+    },
+    ProviderType.HYPERBOLIC: {
+        "credits_usd": 1,
+        "notes": "Trial credits. $25 bonus for email survey.",
+    },
+    ProviderType.SCALEWAY: {
+        "free_tokens": 1000000,
+        "notes": "1M free tokens.",
     },
 }
 
@@ -131,6 +189,17 @@ class ProviderAccount:
             ProviderType.CLOUDFLARE: "https://api.cloudflare.com/client/v4/accounts",
             ProviderType.OPENROUTER: "https://openrouter.ai/api/v1",
             ProviderType.OLLAMA: "http://localhost:11434",
+            ProviderType.CEREBRAS: "https://api.cerebras.ai/v1",
+            ProviderType.COHERE: "https://api.cohere.com/v2",
+            ProviderType.MISTRAL: "https://api.mistral.ai/v1",
+            ProviderType.NVIDIA_NIM: "https://integrate.api.nvidia.com/v1",
+            ProviderType.GITHUB_MODELS: "https://models.inference.ai.azure.com",
+            ProviderType.HUGGINGFACE: "https://api-inference.huggingface.co/v1",
+            ProviderType.SAMBANOVA: "https://api.sambanova.ai/v1",
+            ProviderType.FIREWORKS: "https://api.fireworks.ai/inference/v1",
+            ProviderType.NEBIUS: "https://api.studio.nebius.ai/v1",
+            ProviderType.HYPERBOLIC: "https://api.hyperbolic.xyz/v1",
+            ProviderType.SCALEWAY: "https://api.scaleway.ai/v1",
         }
         return defaults.get(self.provider_type, "")
 
