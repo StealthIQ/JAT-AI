@@ -1,0 +1,66 @@
+<agent_task>
+  <identity>
+    <role>You are Agent {agent_index} of {total_agents} working in parallel on separate branches.</role>
+    <constraints>
+      <constraint>Only modify files within your assigned scope</constraint>
+      <constraint>Write modular code with clean interfaces at scope boundaries</constraint>
+      <constraint>No emojis in code, comments, or commit messages</constraint>
+      <constraint>Follow existing project patterns — do not introduce new frameworks</constraint>
+      <constraint>Web search for error solutions before guessing</constraint>
+    </constraints>
+  </identity>
+
+  <assignment>
+    <title>{title}</title>
+    <branch>{branch_name}</branch>
+    <files_scope>
+      {files_scope}
+    </files_scope>
+  </assignment>
+
+  <context>
+    <repo_info>
+      <owner>{repo_owner}</owner>
+      <name>{repo_name}</name>
+      <default_branch>main</default_branch>
+    </repo_info>
+    <parallel_agents>{total_agents} agents working simultaneously on different branches</parallel_agents>
+    <dependency_context>
+      {dependency_context}
+    </dependency_context>
+  </context>
+
+  <instructions>
+    <task_description>
+      {description}
+    </task_description>
+    <acceptance_criteria>
+      {acceptance_criteria}
+    </acceptance_criteria>
+    <implementation_steps>
+      {steps}
+    </implementation_steps>
+  </instructions>
+
+  <quality_gates>
+    <gate type="pre-flight">Verify you understand the scope before writing code</gate>
+    <gate type="testing">All tests must pass before committing</gate>
+    <gate type="lint">Lint must be clean</gate>
+    <gate type="build">Build must succeed</gate>
+    <gate type="scope">Do not modify files outside your assigned scope</gate>
+  </quality_gates>
+
+  <output>
+    <format>
+      <step>Implement changes within your file scope</step>
+      <step>Write tests for new functionality</step>
+      <step>Run lint and build</step>
+      <step>Commit with clear imperative messages under 72 chars</step>
+      <step>Create PR from {branch_name} to main</step>
+    </format>
+    <pr_requirements>
+      <title>Match your task title</title>
+      <description>List changes made and how to verify</description>
+    </pr_requirements>
+  </output>
+</agent_task>

@@ -1,12 +1,12 @@
 -- JAT-AI Full Schema
--- Run this once to set up all tables
+-- Safe to re-run: uses IF NOT EXISTS and ON CONFLICT
 
 create extension if not exists "uuid-ossp";
 create extension if not exists "pgcrypto";
 
 -- Jules account management
 
-create table accounts (
+create table if not exists accounts (
     id uuid primary key default uuid_generate_v4(),
     name text not null,
     api_key_hash text not null,
@@ -18,7 +18,7 @@ create table accounts (
     updated_at timestamptz not null default now()
 );
 
-create table account_sources (
+create table if not exists account_sources (
     id uuid primary key default uuid_generate_v4(),
     account_id uuid not null references accounts(id) on delete cascade,
     source_name text not null,
@@ -30,7 +30,7 @@ create table account_sources (
 
 -- Workflows and tasks
 
-create table workflows (
+create table if not exists workflows (
     id uuid primary key default uuid_generate_v4(),
     name text not null,
     description text not null default '',
@@ -40,7 +40,7 @@ create table workflows (
     updated_at timestamptz not null default now()
 );
 
-create table agent_tasks (
+create table if not exists agent_tasks (
     id uuid primary key default uuid_generate_v4(),
     workflow_id uuid references workflows(id) on delete cascade,
     parent_task_id uuid references agent_tasks(id) on delete set null,
@@ -62,7 +62,7 @@ create table agent_tasks (
 
 -- Context passing and merge queue
 
-create table context_messages (
+create table if not exists context_messages (
     id uuid primary key default uuid_generate_v4(),
     from_task_id uuid references agent_tasks(id) on delete cascade,
     to_task_id uuid references agent_tasks(id) on delete cascade,
@@ -72,7 +72,7 @@ create table context_messages (
     created_at timestamptz not null default now()
 );
 
-create table merge_queue (
+create table if not exists merge_queue (
     id uuid primary key default uuid_generate_v4(),
     task_id uuid not null references agent_tasks(id) on delete cascade,
     repo_owner text not null,
@@ -91,7 +91,7 @@ create table merge_queue (
     updated_at timestamptz not null default now()
 );
 
-create table session_activities (
+create table if not exists session_activities (
     id uuid primary key default uuid_generate_v4(),
     task_id uuid not null references agent_tasks(id) on delete cascade,
     session_id text not null,
@@ -105,9 +105,9 @@ create table session_activities (
     unique (session_id, activity_id)
 );
 
--- AI provider management (encrypted keys)
+-- AI provider management
 
-create table ai_providers (
+create table if not exists ai_providers (
     id uuid primary key default uuid_generate_v4(),
     provider_type text not null
         check (provider_type in ('groq', 'google', 'cloudflare', 'openrouter', 'ollama')),
@@ -123,7 +123,7 @@ create table ai_providers (
 
 -- Conversations
 
-create table conversations (
+create table if not exists conversations (
     id uuid primary key default uuid_generate_v4(),
     title text not null default 'New Conversation',
     provider_id uuid references ai_providers(id) on delete set null,
@@ -139,7 +139,7 @@ create table conversations (
     updated_at timestamptz not null default now()
 );
 
-create table conversation_messages (
+create table if not exists conversation_messages (
     id uuid primary key default uuid_generate_v4(),
     conversation_id uuid not null references conversations(id) on delete cascade,
     role text not null check (role in ('user', 'assistant', 'system')),
@@ -149,14 +149,150 @@ create table conversation_messages (
     created_at timestamptz not null default now()
 );
 
--- Indexes
+-- Prompt library
 
-create index idx_agent_tasks_workflow on agent_tasks(workflow_id);
-create index idx_agent_tasks_status on agent_tasks(status);
-create index idx_context_messages_to on context_messages(to_task_id);
-create index idx_merge_queue_task on merge_queue(task_id);
-create index idx_session_activities_task on session_activities(task_id);
-create index idx_session_activities_session on session_activities(session_id);
-create index idx_conv_messages_conv on conversation_messages(conversation_id);
-create index idx_conversations_status on conversations(status);
-create index idx_ai_providers_type on ai_providers(provider_type);
+create table if not exists prompts (
+    id uuid primary key default uuid_generate_v4(),
+    name text not null unique,
+    source text not null default 'user' check (source in ('builtin', 'user')),
+    content text not null default '',
+    format text not null default 'xml' check (format in ('xml', 'text')),
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now()
+);
+
+-- Indexes (IF NOT EXISTS not supported for indexes, so use a DO block)
+
+do $$ begin
+  if not exists (select 1 from pg_indexes where indexname = 'idx_agent_tasks_workflow') then
+    create index idx_agent_tasks_workflow on agent_tasks(workflow_id);
+  end if;
+  if not exists (select 1 from pg_indexes where indexname = 'idx_agent_tasks_status') then
+    create index idx_agent_tasks_status on agent_tasks(status);
+  end if;
+  if not exists (select 1 from pg_indexes where indexname = 'idx_context_messages_to') then
+    create index idx_context_messages_to on context_messages(to_task_id);
+  end if;
+  if not exists (select 1 from pg_indexes where indexname = 'idx_merge_queue_task') then
+    create index idx_merge_queue_task on merge_queue(task_id);
+  end if;
+  if not exists (select 1 from pg_indexes where indexname = 'idx_session_activities_task') then
+    create index idx_session_activities_task on session_activities(task_id);
+  end if;
+  if not exists (select 1 from pg_indexes where indexname = 'idx_session_activities_session') then
+    create index idx_session_activities_session on session_activities(session_id);
+  end if;
+  if not exists (select 1 from pg_indexes where indexname = 'idx_conv_messages_conv') then
+    create index idx_conv_messages_conv on conversation_messages(conversation_id);
+  end if;
+  if not exists (select 1 from pg_indexes where indexname = 'idx_conversations_status') then
+    create index idx_conversations_status on conversations(status);
+  end if;
+  if not exists (select 1 from pg_indexes where indexname = 'idx_ai_providers_type') then
+    create index idx_ai_providers_type on ai_providers(provider_type);
+  end if;
+  if not exists (select 1 from pg_indexes where indexname = 'idx_prompts_source') then
+    create index idx_prompts_source on prompts(source);
+  end if;
+end $$;
+
+-- Seed built-in prompts (safe to re-run)
+
+insert into prompts (name, source, content, format) values
+('security-audit', 'builtin', '<prompt name="security-audit">
+  <description>Deep security review of API endpoints and data handling</description>
+  <system_instruction>
+    You are a security specialist. Analyze the codebase for vulnerabilities.
+  </system_instruction>
+  <user_input>
+    Repository context via Repomix. Focus areas provided by user.
+  </user_input>
+  <constraints>
+    <constraint>Check for SQL injection, XSS, auth bypass, rate limiting, input validation</constraint>
+    <constraint>Check for CORS misconfiguration and exposed secrets</constraint>
+    <constraint>Produce a prioritized list of findings with severity levels</constraint>
+    <constraint>Decompose fixes into agent tasks with specific file scopes</constraint>
+  </constraints>
+  <output_format>
+    <format>JSON agent decomposition with findings summary</format>
+  </output_format>
+</prompt>', 'xml'),
+
+('add-tests', 'builtin', '<prompt name="add-tests">
+  <description>Add comprehensive unit tests for components lacking coverage</description>
+  <system_instruction>
+    You are a testing specialist. Identify untested code and write tests.
+  </system_instruction>
+  <user_input>
+    Repository context via Repomix. Target components specified by user.
+  </user_input>
+  <constraints>
+    <constraint>Follow existing test patterns in the project</constraint>
+    <constraint>Use the projects test framework — do not introduce new ones</constraint>
+    <constraint>Aim for over 80% coverage on new code</constraint>
+    <constraint>Test edge cases, error paths, and happy paths</constraint>
+  </constraints>
+  <output_format>
+    <format>JSON agent decomposition grouped by test scope</format>
+  </output_format>
+</prompt>', 'xml'),
+
+('code-review', 'builtin', '<prompt name="code-review">
+  <description>Review codebase for quality issues and create findings report</description>
+  <system_instruction>
+    You are a code review specialist. Analyze for quality, performance, and maintainability.
+  </system_instruction>
+  <user_input>
+    Repository context via Repomix. Review scope defined by user.
+  </user_input>
+  <constraints>
+    <constraint>Check code style consistency and error handling patterns</constraint>
+    <constraint>Identify performance bottlenecks and memory leaks</constraint>
+    <constraint>Flag missing tests and architectural problems</constraint>
+    <constraint>Produce actionable findings, not vague suggestions</constraint>
+  </constraints>
+  <output_format>
+    <format>REVIEW.md with prioritized findings, then JSON agent decomposition for fixes</format>
+  </output_format>
+</prompt>', 'xml'),
+
+('new-project', 'builtin', '<prompt name="new-project">
+  <description>Plan and scaffold a new repository from scratch</description>
+  <system_instruction>
+    You are a senior software architect. Help the user plan a new project.
+    Ask clarifying questions about tech stack, platform, features, testing, and deployment.
+    Once clear, propose a structure and decompose into agent tasks.
+  </system_instruction>
+  <user_input>
+    User describes what they want to build. No repo context needed.
+  </user_input>
+  <constraints>
+    <constraint>Ask clarifying questions before proposing architecture</constraint>
+    <constraint>Each agent task must be completable in a single session</constraint>
+    <constraint>Use well-established frameworks, not bleeding-edge experiments</constraint>
+    <constraint>Include CI/CD setup as one of the agent tasks</constraint>
+  </constraints>
+  <output_format>
+    <format>Project structure overview, then JSON agent decomposition</format>
+  </output_format>
+</prompt>', 'xml'),
+
+('fix-issues', 'builtin', '<prompt name="fix-issues">
+  <description>Analyze and fix bugs or issues in an existing repo</description>
+  <system_instruction>
+    You are a debugging specialist. Identify root causes and propose fixes.
+  </system_instruction>
+  <user_input>
+    Repository context via Repomix. Bug description or error logs from user.
+  </user_input>
+  <constraints>
+    <constraint>Identify root cause before proposing fixes</constraint>
+    <constraint>Each fix targets specific files with clear acceptance criteria</constraint>
+    <constraint>Include regression tests for each bug fix</constraint>
+    <constraint>Do not refactor unrelated code while fixing bugs</constraint>
+  </constraints>
+  <output_format>
+    <format>Root cause analysis, then JSON agent decomposition for fixes</format>
+  </output_format>
+</prompt>', 'xml')
+on conflict (name) do nothing;

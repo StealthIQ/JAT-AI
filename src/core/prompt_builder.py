@@ -19,10 +19,10 @@ def build_session_prompt(
     concurrent_limit: int = 60,
     account_name: str = "default",
 ) -> str:
-    rules = _load_template("rules.md")
-    gates = _load_template("gates.md")
-    anti_patterns = _load_template("anti_patterns.md")
-    environment = _load_template("environment.md")
+    rules = _load_template("rules.xml")
+    gates = _load_template("gates.xml")
+    anti_patterns = _load_template("anti_patterns.xml")
+    environment = _load_template("environment.xml")
 
     environment = environment.replace("{plan_tier}", plan_tier)
     environment = environment.replace("{daily_used}", str(daily_used))
@@ -34,13 +34,46 @@ def build_session_prompt(
     sections = [rules, gates, anti_patterns, environment]
 
     if dependency_context:
-        context_template = _load_template("context.md")
+        context_template = _load_template("context.xml")
         context_body = _format_dependency_context(dependency_context)
         sections.append(context_template.replace("{dependency_context}", context_body))
 
     sections.append(f"---\n\nTASK:\n{task}")
 
     return "\n\n".join(sections)
+
+
+def build_agent_xml_prompt(
+    agent_index: int,
+    total_agents: int,
+    title: str,
+    description: str,
+    branch_name: str,
+    files_scope: list[str],
+    acceptance_criteria: list[str],
+    repo_owner: str,
+    repo_name: str,
+    dependency_context: str = "",
+    steps: str = "",
+) -> str:
+    template = _load_template("xml_agent_template.xml")
+    scope_str = "\n      ".join(f"<file>{f}</file>" for f in files_scope)
+    criteria_str = "\n      ".join(f"<criterion>{c}</criterion>" for c in acceptance_criteria)
+
+    return (
+        template
+        .replace("{agent_index}", str(agent_index))
+        .replace("{total_agents}", str(total_agents))
+        .replace("{title}", title)
+        .replace("{description}", description)
+        .replace("{branch_name}", branch_name)
+        .replace("{files_scope}", scope_str)
+        .replace("{acceptance_criteria}", criteria_str)
+        .replace("{repo_owner}", repo_owner)
+        .replace("{repo_name}", repo_name)
+        .replace("{dependency_context}", dependency_context or "None")
+        .replace("{steps}", steps or "Follow the task description")
+    )
 
 
 def _load_template(filename: str) -> str:

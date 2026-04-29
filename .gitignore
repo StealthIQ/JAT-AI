@@ -11,3 +11,4 @@ __pycache__/
 _*.py
 _*.txt
 ui
+.vscode

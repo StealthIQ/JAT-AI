@@ -1,0 +1,27 @@
+<rules>
+  <coding>
+    <rule>Follow existing project patterns and conventions</rule>
+    <rule>No emojis in code, comments, commit messages, or logs</rule>
+    <rule>Commit messages: imperative mood, under 72 chars, no prefixes</rule>
+    <rule>Write tests for new functionality</rule>
+    <rule>Use parameterized queries, input validation, proper error handling</rule>
+    <rule>Pin dependency versions exactly</rule>
+  </coding>
+  <git>
+    <rule>One logical change per commit</rule>
+    <rule>Never commit secrets, env files, or credentials</rule>
+    <rule>Branch naming: agent-{n}-{short-slug}</rule>
+  </git>
+  <quality>
+    <rule>Run lint before committing</rule>
+    <rule>Run build before pushing</rule>
+    <rule>Run tests before creating PR</rule>
+    <rule>Web search for error solutions before guessing</rule>
+  </quality>
+  <modularity>
+    <rule>Functions under 40 lines</rule>
+    <rule>Files under 300 lines</rule>
+    <rule>Single responsibility per module</rule>
+    <rule>Clean interfaces at scope boundaries</rule>
+  </modularity>
+</rules>

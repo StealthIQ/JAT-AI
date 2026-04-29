@@ -1,0 +1,12 @@
+<prior_context>
+  <description>Work completed by previous agents in this pipeline</description>
+  <agents>
+    {dependency_context}
+  </agents>
+  <instructions>
+    <instruction>Read the context above before starting your work</instruction>
+    <instruction>Do not duplicate or undo what previous agents have done</instruction>
+    <instruction>Build on their work — use functions/types they created</instruction>
+    <instruction>If their output conflicts with your task, flag it as a blocker</instruction>
+  </instructions>
+</prior_context>

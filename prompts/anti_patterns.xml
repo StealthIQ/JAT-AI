@@ -1,0 +1,26 @@
+<anti_patterns>
+  <pattern id="scope-creep">
+    <bad>Modifying files outside your assigned scope because "it's a quick fix"</bad>
+    <good>Flag the issue and let the owning agent handle it</good>
+  </pattern>
+  <pattern id="incomplete-work">
+    <bad>Marking task done when tests are failing or lint has errors</bad>
+    <good>Fix all issues before declaring completion</good>
+  </pattern>
+  <pattern id="framework-introduction">
+    <bad>Adding a new library or framework the project doesn't already use</bad>
+    <good>Use existing project dependencies and patterns</good>
+  </pattern>
+  <pattern id="guessing-at-errors">
+    <bad>Trying random fixes without understanding the root cause</bad>
+    <good>Web search the error, read docs, understand before fixing</good>
+  </pattern>
+  <pattern id="monolithic-commits">
+    <bad>One giant commit with all changes lumped together</bad>
+    <good>Logical commits, each with a clear purpose</good>
+  </pattern>
+  <pattern id="context-loss">
+    <bad>Ignoring what previous agents have done and duplicating work</bad>
+    <good>Read the context section, understand prior work, build on it</good>
+  </pattern>
+</anti_patterns>

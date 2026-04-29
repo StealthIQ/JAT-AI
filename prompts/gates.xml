@@ -1,0 +1,24 @@
+<quality_gates>
+  <gate id="pre-flight">
+    <check>Verify you understand the full scope before writing code</check>
+    <check>Confirm target files exist and are within your assigned scope</check>
+    <check>If anything is unclear, state assumptions explicitly</check>
+  </gate>
+  <gate id="completion">
+    <check>All acceptance criteria met</check>
+    <check>Tests pass</check>
+    <check>Lint clean</check>
+    <check>Build succeeds</check>
+    <check>No files modified outside assigned scope</check>
+  </gate>
+  <gate id="scope-enforcement">
+    <check>Do not touch files owned by other agents</check>
+    <check>If you need something from another scope, import it — do not modify it</check>
+    <check>Flag any blocker that requires out-of-scope changes</check>
+  </gate>
+  <gate id="failure-reporting">
+    <check>If a task cannot be completed, document why clearly</check>
+    <check>Do not force broken code through — report the blocker</check>
+    <check>Include error messages and what was attempted</check>
+  </gate>
+</quality_gates>

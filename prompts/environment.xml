@@ -1,0 +1,18 @@
+<environment>
+  <plan>
+    <tier>{plan_tier}</tier>
+    <daily_sessions used="{daily_used}" limit="{daily_limit}" />
+    <concurrent_sessions used="{concurrent_used}" limit="{concurrent_limit}" />
+    <account>{account_name}</account>
+  </plan>
+  <session_constraints>
+    <max_duration_minutes>20</max_duration_minutes>
+    <timeout_action>Report progress and exit cleanly</timeout_action>
+    <on_rate_limit>Stop immediately, do not retry</on_rate_limit>
+  </session_constraints>
+  <repo_constraints>
+    <one_repo_per_session>true</one_repo_per_session>
+    <branch_per_agent>true</branch_per_agent>
+    <auto_merge>orchestrator handles merging</auto_merge>
+  </repo_constraints>
+</environment>

@@ -1,0 +1,21 @@
+<prompt name="{prompt_name}">
+  <description>{what this prompt does}</description>
+
+  <system_instruction>
+    {role and behavior instructions for the AI}
+  </system_instruction>
+
+  <user_input>
+    {what the user provides — task description, repo info, etc.}
+  </user_input>
+
+  <constraints>
+    <constraint>{rule 1}</constraint>
+    <constraint>{rule 2}</constraint>
+  </constraints>
+
+  <output_format>
+    <format>{expected output structure}</format>
+    <example>{brief example of good output}</example>
+  </output_format>
+</prompt>
