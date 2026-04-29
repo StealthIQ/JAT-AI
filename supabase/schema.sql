@@ -1,5 +1,6 @@
--- JAT-AI Full Schema
--- Safe to re-run: uses IF NOT EXISTS and ON CONFLICT
+-- JAT-AI Supabase Setup
+-- Run this ONCE on a fresh project, or re-run anytime to update constraints.
+-- Safe to run multiple times.
 
 create extension if not exists "uuid-ossp";
 create extension if not exists "pgcrypto";
@@ -105,14 +106,13 @@ create table if not exists session_activities (
     unique (session_id, activity_id)
 );
 
--- AI provider management
+-- AI provider management (encrypted keys stored as text)
 
 create table if not exists ai_providers (
     id uuid primary key default uuid_generate_v4(),
-    provider_type text not null
-        check (provider_type in ('groq', 'google', 'cloudflare', 'openrouter', 'ollama', 'cerebras', 'cohere', 'mistral', 'nvidia_nim', 'github_models', 'huggingface', 'sambanova', 'fireworks', 'nebius', 'hyperbolic', 'scaleway', 'longcat')),
+    provider_type text not null,
     name text not null unique,
-    api_key_encrypted bytea,
+    api_key_encrypted text,
     model text not null default '',
     base_url text not null default '',
     enabled boolean not null default true,
@@ -120,6 +120,11 @@ create table if not exists ai_providers (
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now()
 );
+
+-- Drop and recreate provider_type constraint so it always has the latest list
+alter table ai_providers drop constraint if exists ai_providers_provider_type_check;
+alter table ai_providers add constraint ai_providers_provider_type_check
+    check (provider_type in ('groq', 'google', 'cloudflare', 'openrouter', 'ollama', 'cerebras', 'cohere', 'mistral', 'nvidia_nim', 'github_models', 'huggingface', 'sambanova', 'fireworks', 'nebius', 'hyperbolic', 'scaleway', 'longcat'));
 
 -- Conversations
 
@@ -161,7 +166,7 @@ create table if not exists prompts (
     updated_at timestamptz not null default now()
 );
 
--- Indexes (IF NOT EXISTS not supported for indexes, so use a DO block)
+-- Indexes (idempotent via DO block)
 
 do $$ begin
   if not exists (select 1 from pg_indexes where indexname = 'idx_agent_tasks_workflow') then
@@ -196,103 +201,71 @@ do $$ begin
   end if;
 end $$;
 
--- Seed built-in prompts (safe to re-run)
+-- Seed built-in prompts (skip if already exist)
 
 insert into prompts (name, source, content, format) values
 ('security-audit', 'builtin', '<prompt name="security-audit">
   <description>Deep security review of API endpoints and data handling</description>
-  <system_instruction>
-    You are a security specialist. Analyze the codebase for vulnerabilities.
-  </system_instruction>
-  <user_input>
-    Repository context via Repomix. Focus areas provided by user.
-  </user_input>
+  <system_instruction>You are a security specialist. Analyze the codebase for vulnerabilities.</system_instruction>
   <constraints>
     <constraint>Check for SQL injection, XSS, auth bypass, rate limiting, input validation</constraint>
-    <constraint>Check for CORS misconfiguration and exposed secrets</constraint>
     <constraint>Produce a prioritized list of findings with severity levels</constraint>
     <constraint>Decompose fixes into agent tasks with specific file scopes</constraint>
   </constraints>
-  <output_format>
-    <format>JSON agent decomposition with findings summary</format>
-  </output_format>
+  <output_format>JSON agent decomposition with findings summary</output_format>
 </prompt>', 'xml'),
-
 ('add-tests', 'builtin', '<prompt name="add-tests">
   <description>Add comprehensive unit tests for components lacking coverage</description>
-  <system_instruction>
-    You are a testing specialist. Identify untested code and write tests.
-  </system_instruction>
-  <user_input>
-    Repository context via Repomix. Target components specified by user.
-  </user_input>
+  <system_instruction>You are a testing specialist. Identify untested code and write tests.</system_instruction>
   <constraints>
     <constraint>Follow existing test patterns in the project</constraint>
-    <constraint>Use the projects test framework — do not introduce new ones</constraint>
     <constraint>Aim for over 80% coverage on new code</constraint>
     <constraint>Test edge cases, error paths, and happy paths</constraint>
   </constraints>
-  <output_format>
-    <format>JSON agent decomposition grouped by test scope</format>
-  </output_format>
+  <output_format>JSON agent decomposition grouped by test scope</output_format>
 </prompt>', 'xml'),
-
 ('code-review', 'builtin', '<prompt name="code-review">
   <description>Review codebase for quality issues and create findings report</description>
-  <system_instruction>
-    You are a code review specialist. Analyze for quality, performance, and maintainability.
-  </system_instruction>
-  <user_input>
-    Repository context via Repomix. Review scope defined by user.
-  </user_input>
+  <system_instruction>You are a code review specialist. Analyze for quality, performance, and maintainability.</system_instruction>
   <constraints>
     <constraint>Check code style consistency and error handling patterns</constraint>
     <constraint>Identify performance bottlenecks and memory leaks</constraint>
-    <constraint>Flag missing tests and architectural problems</constraint>
     <constraint>Produce actionable findings, not vague suggestions</constraint>
   </constraints>
-  <output_format>
-    <format>REVIEW.md with prioritized findings, then JSON agent decomposition for fixes</format>
-  </output_format>
+  <output_format>REVIEW.md with prioritized findings, then JSON agent decomposition</output_format>
 </prompt>', 'xml'),
-
 ('new-project', 'builtin', '<prompt name="new-project">
   <description>Plan and scaffold a new repository from scratch</description>
-  <system_instruction>
-    You are a senior software architect. Help the user plan a new project.
-    Ask clarifying questions about tech stack, platform, features, testing, and deployment.
-    Once clear, propose a structure and decompose into agent tasks.
-  </system_instruction>
-  <user_input>
-    User describes what they want to build. No repo context needed.
-  </user_input>
+  <system_instruction>You are a senior software architect. Help the user plan a new project.</system_instruction>
   <constraints>
     <constraint>Ask clarifying questions before proposing architecture</constraint>
     <constraint>Each agent task must be completable in a single session</constraint>
-    <constraint>Use well-established frameworks, not bleeding-edge experiments</constraint>
     <constraint>Include CI/CD setup as one of the agent tasks</constraint>
   </constraints>
-  <output_format>
-    <format>Project structure overview, then JSON agent decomposition</format>
-  </output_format>
+  <output_format>Project structure overview, then JSON agent decomposition</output_format>
 </prompt>', 'xml'),
-
 ('fix-issues', 'builtin', '<prompt name="fix-issues">
   <description>Analyze and fix bugs or issues in an existing repo</description>
-  <system_instruction>
-    You are a debugging specialist. Identify root causes and propose fixes.
-  </system_instruction>
-  <user_input>
-    Repository context via Repomix. Bug description or error logs from user.
-  </user_input>
+  <system_instruction>You are a debugging specialist. Identify root causes and propose fixes.</system_instruction>
   <constraints>
     <constraint>Identify root cause before proposing fixes</constraint>
-    <constraint>Each fix targets specific files with clear acceptance criteria</constraint>
     <constraint>Include regression tests for each bug fix</constraint>
     <constraint>Do not refactor unrelated code while fixing bugs</constraint>
   </constraints>
-  <output_format>
-    <format>Root cause analysis, then JSON agent decomposition for fixes</format>
-  </output_format>
+  <output_format>Root cause analysis, then JSON agent decomposition for fixes</output_format>
 </prompt>', 'xml')
 on conflict (name) do nothing;
+
+-- Disable RLS on all tables (private backend, no public access)
+
+alter table accounts disable row level security;
+alter table account_sources disable row level security;
+alter table workflows disable row level security;
+alter table agent_tasks disable row level security;
+alter table context_messages disable row level security;
+alter table merge_queue disable row level security;
+alter table session_activities disable row level security;
+alter table ai_providers disable row level security;
+alter table conversations disable row level security;
+alter table conversation_messages disable row level security;
+alter table prompts disable row level security;

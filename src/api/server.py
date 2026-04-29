@@ -6,6 +6,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from api.providers import router as providers_router
 from clients.supabase import SupabaseClient
 from config import load_settings
 
@@ -26,6 +27,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.include_router(providers_router)
 
 
 class PromptCreate(BaseModel):
@@ -88,77 +90,12 @@ async def delete_prompt(name: str):
     return {"ok": True}
 
 
-# --- Provider management (encrypted keys) ---
-
-class ProviderCreate(BaseModel):
-    provider_type: str
-    name: str
-    api_key: str = ""
-    model: str = ""
-    base_url: str = ""
-    daily_limit: int = 0
-
-
-class ProviderToggle(BaseModel):
-    enabled: bool
-
-
-@app.get("/api/providers")
-async def list_providers():
-    rows = await db.select(
-        "ai_providers",
-        columns="id, provider_type, name, model, base_url, enabled, daily_limit, api_key_encrypted",
-    )
-    providers = [{
-        "id": r["id"],
-        "provider_type": r["provider_type"],
-        "name": r["name"],
-        "model": r["model"],
-        "base_url": r["base_url"],
-        "enabled": r["enabled"],
-        "daily_limit": r["daily_limit"],
-        "has_key": r["api_key_encrypted"] is not None,
-    } for r in rows]
-    return {"providers": providers}
-
-
-@app.post("/api/providers", status_code=201)
-async def create_provider(body: ProviderCreate):
-    from core.ai_interface import KeyVault
-    vault = KeyVault(settings.encryption_key)
-    encrypted = vault.encrypt(body.api_key) if body.api_key else None
-    row = await db.insert("ai_providers", {
-        "provider_type": body.provider_type,
-        "name": body.name,
-        "api_key_encrypted": encrypted,
-        "model": body.model,
-        "base_url": body.base_url,
-        "daily_limit": body.daily_limit,
-        "enabled": True,
-    })
-    return row
-
-
-@app.patch("/api/providers/{provider_id}")
-async def toggle_provider(provider_id: str, body: ProviderToggle):
-    updated = await db.update(
-        "ai_providers", {"enabled": body.enabled}, {"id": provider_id}
-    )
-    return updated[0] if updated else {"ok": True}
-
-
-@app.delete("/api/providers/{provider_id}")
-async def delete_provider(provider_id: str):
-    await db.delete("ai_providers", {"id": provider_id})
-    return {"ok": True}
-
-
 # --- Agent tasks (terminals on the canvas) ---
 
 @app.get("/api/terminals")
 async def list_terminals():
     rows = await db.select("agent_tasks")
-    terminals = [{
+    return [{
         "terminalId": r["id"],
         "label": r.get("prompt", "")[:40],
         "state": "live" if r["status"] == "running" else ("queued" if r["status"] == "pending" else "idle"),
@@ -171,7 +108,6 @@ async def list_terminals():
         "hasUserPrompt": True,
         "sessionId": r.get("session_id", ""),
     } for r in rows]
-    return terminals
 
 
 @app.get("/api/terminal-snapshots")
@@ -215,12 +151,10 @@ async def list_tentacles():
     return list(repos.values())
 
 
-# --- Conversations ---
-
 @app.get("/api/conversations")
 async def list_conversations():
     rows = await db.select("conversations")
-    sessions = [{
+    return {"sessions": [{
         "sessionId": r["id"],
         "tentacleId": f"{r['repo_owner']}/{r['repo_name']}" if r.get("repo_owner") else "",
         "startedAt": r["created_at"],
@@ -233,11 +167,8 @@ async def list_conversations():
         "firstUserTurnPreview": r.get("title", ""),
         "lastUserTurnPreview": r.get("title", ""),
         "lastAssistantTurnPreview": "",
-    } for r in rows]
-    return {"sessions": sessions}
+    } for r in rows]}
 
-
-# --- Usage stats ---
 
 @app.get("/api/claude/usage")
 async def get_usage():
@@ -246,7 +177,7 @@ async def get_usage():
     active_count = len([a for a in accounts if a.get("enabled")])
     return {
         "status": "ok",
-        "fetchedAt": settings.supabase_url and "connected" or "disconnected",
+        "fetchedAt": "connected" if settings.supabase_url else "disconnected",
         "source": "cli-pty",
         "planType": "ultra",
         "primaryUsedPercent": 0,
@@ -257,3 +188,91 @@ async def get_usage():
         "extraUsageCostLimit": total_daily or 300,
         "message": f"0/{total_daily or 300} daily sessions | {active_count} accounts",
     }
+
+
+# --- Static endpoints and UI write catch-alls ---
+# Octogent UI expects these but we don't persist them yet
+
+@app.get("/api/ui-state")
+async def get_ui_state():
+    return {
+        "activePrimaryNav": 1,
+        "sidebarWidth": 260,
+        "isAgentsSidebarVisible": True,
+        "isRuntimeStatusStripVisible": True,
+        "isBottomTelemetryVisible": False,
+        "isMonitorVisible": True,
+        "minimizedTerminalIds": [],
+        "isActiveAgentsSectionExpanded": True,
+        "isClaudeUsageSectionExpanded": True,
+        "isCodexUsageSectionExpanded": False,
+        "terminalCompletionSound": "none",
+        "canvasOpenTerminalIds": [],
+        "canvasOpenTentacleIds": [],
+        "canvasTerminalsPanelWidth": None,
+    }
+
+
+@app.put("/api/ui-state")
+async def put_ui_state():
+    return {"ok": True}
+
+
+@app.patch("/api/ui-state")
+async def patch_ui_state():
+    return {"ok": True}
+
+
+@app.get("/api/setup")
+async def get_setup():
+    return {"shouldShowSetupCard": False, "steps": []}
+
+
+@app.get("/api/codex/usage")
+async def get_codex_usage():
+    return {"status": "unavailable", "source": "none"}
+
+
+@app.get("/api/github/summary")
+async def get_github_summary():
+    return {"status": "ok", "repo": "", "stargazerCount": 0, "openIssueCount": 0, "openPullRequestCount": 0, "commitsPerDay": [], "recentCommits": []}
+
+
+@app.get("/api/analytics/usage-heatmap")
+async def get_usage_heatmap():
+    return {"days": [], "projects": [], "models": []}
+
+
+@app.get("/api/monitor/feed")
+async def get_monitor_feed():
+    return {"providerId": "x", "queryTerms": [], "posts": [], "isStale": False, "lastError": None}
+
+
+@app.get("/api/monitor/config")
+async def get_monitor_config():
+    return {"providerId": "x", "queryTerms": [], "refreshPolicy": {"maxCacheAgeMs": 3600000, "maxPosts": 30, "searchWindowDays": 7}, "providers": {}}
+
+
+@app.get("/api/code-intel/events")
+async def get_code_intel():
+    return {"events": []}
+
+
+@app.get("/api/deck/skills")
+async def get_deck_skills():
+    return []
+
+
+@app.post("/api/terminals")
+async def post_terminals():
+    return {"ok": True}
+
+
+@app.put("/api/deck/tentacles/{tentacle_id}")
+async def put_tentacle(tentacle_id: str):
+    return {"ok": True}
+
+
+@app.post("/api/deck/tentacles")
+async def post_tentacle():
+    return {"ok": True}
