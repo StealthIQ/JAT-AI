@@ -28,6 +28,13 @@
     "key": "",
     "realtime_enabled": true
   },
+  "database": {
+    "mode": "local",
+    "local": {
+      "path": "./data/jat.db"
+    },
+    "sync_interval": 30
+  },
   "ai_providers": {
     "accounts": [
       {
@@ -101,7 +108,7 @@
     "stale_threshold": 600,
     "max_cached_activities": 200
   },
-  "ui": {
+  "dashboard": {
     "port": 3000,
     "api_port": 8787
   }
