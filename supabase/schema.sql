@@ -110,7 +110,7 @@ create table if not exists session_activities (
 create table if not exists ai_providers (
     id uuid primary key default uuid_generate_v4(),
     provider_type text not null
-        check (provider_type in ('groq', 'google', 'cloudflare', 'openrouter', 'ollama', 'cerebras', 'cohere', 'mistral', 'nvidia_nim', 'github_models', 'huggingface', 'sambanova', 'fireworks', 'nebius', 'hyperbolic', 'scaleway')),
+        check (provider_type in ('groq', 'google', 'cloudflare', 'openrouter', 'ollama', 'cerebras', 'cohere', 'mistral', 'nvidia_nim', 'github_models', 'huggingface', 'sambanova', 'fireworks', 'nebius', 'hyperbolic', 'scaleway', 'longcat')),
     name text not null unique,
     api_key_encrypted bytea,
     model text not null default '',

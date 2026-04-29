@@ -151,3 +151,109 @@ async def toggle_provider(provider_id: str, body: ProviderToggle):
 async def delete_provider(provider_id: str):
     await db.delete("ai_providers", {"id": provider_id})
     return {"ok": True}
+
+
+# --- Agent tasks (terminals on the canvas) ---
+
+@app.get("/api/terminals")
+async def list_terminals():
+    rows = await db.select("agent_tasks")
+    terminals = [{
+        "terminalId": r["id"],
+        "label": r.get("prompt", "")[:40],
+        "state": "live" if r["status"] == "running" else ("queued" if r["status"] == "pending" else "idle"),
+        "tentacleId": f"{r['repo_owner']}/{r['repo_name']}",
+        "tentacleName": r.get("prompt", "")[:30],
+        "workspaceMode": "shared",
+        "createdAt": r["created_at"],
+        "agentRuntimeState": "processing" if r["status"] == "running" else "idle",
+        "lifecycleState": "running" if r["status"] == "running" else ("registered" if r["status"] == "pending" else "exited"),
+        "hasUserPrompt": True,
+        "sessionId": r.get("session_id", ""),
+    } for r in rows]
+    return terminals
+
+
+@app.get("/api/terminal-snapshots")
+async def list_terminal_snapshots():
+    return await list_terminals()
+
+
+# --- Repos (tentacles on the canvas) ---
+
+@app.get("/api/deck/tentacles")
+async def list_tentacles():
+    rows = await db.select("agent_tasks")
+    repos: dict[str, dict] = {}
+    for r in rows:
+        key = f"{r['repo_owner']}/{r['repo_name']}"
+        if key not in repos:
+            repos[key] = {
+                "tentacleId": key,
+                "displayName": key,
+                "description": "",
+                "status": "idle",
+                "color": "#d6a21a",
+                "octopus": {"animation": "idle", "expression": "normal", "accessory": "none", "hairColor": None},
+                "scope": {"paths": [key], "tags": []},
+                "vaultFiles": [],
+                "todoTotal": 0,
+                "todoDone": 0,
+                "todoItems": [],
+                "suggestedSkills": [],
+            }
+        repo = repos[key]
+        repo["todoTotal"] += 1
+        if r["status"] in ("completed", "failed"):
+            repo["todoDone"] += 1
+        if r["status"] == "running":
+            repo["status"] = "active"
+        repo["todoItems"].append({
+            "text": r.get("prompt", "")[:60],
+            "done": r["status"] in ("completed",),
+        })
+    return list(repos.values())
+
+
+# --- Conversations ---
+
+@app.get("/api/conversations")
+async def list_conversations():
+    rows = await db.select("conversations")
+    sessions = [{
+        "sessionId": r["id"],
+        "tentacleId": f"{r['repo_owner']}/{r['repo_name']}" if r.get("repo_owner") else "",
+        "startedAt": r["created_at"],
+        "endedAt": r.get("updated_at"),
+        "lastEventAt": r.get("updated_at"),
+        "eventCount": 0,
+        "turnCount": 0,
+        "userTurnCount": 0,
+        "assistantTurnCount": 0,
+        "firstUserTurnPreview": r.get("title", ""),
+        "lastUserTurnPreview": r.get("title", ""),
+        "lastAssistantTurnPreview": "",
+    } for r in rows]
+    return {"sessions": sessions}
+
+
+# --- Usage stats ---
+
+@app.get("/api/claude/usage")
+async def get_usage():
+    accounts = await db.select("accounts")
+    total_daily = sum(a.get("max_daily_tasks", 0) for a in accounts)
+    active_count = len([a for a in accounts if a.get("enabled")])
+    return {
+        "status": "ok",
+        "fetchedAt": settings.supabase_url and "connected" or "disconnected",
+        "source": "cli-pty",
+        "planType": "ultra",
+        "primaryUsedPercent": 0,
+        "primaryResetAt": None,
+        "secondaryUsedPercent": 0,
+        "secondaryResetAt": None,
+        "extraUsageCostUsed": 0,
+        "extraUsageCostLimit": total_daily or 300,
+        "message": f"0/{total_daily or 300} daily sessions | {active_count} accounts",
+    }

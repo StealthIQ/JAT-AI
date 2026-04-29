@@ -31,6 +31,7 @@ class ProviderType(StrEnum):
     NEBIUS = "nebius"
     HYPERBOLIC = "hyperbolic"
     SCALEWAY = "scaleway"
+    LONGCAT = "longcat"
 
 
 # Verified free tier limits as of April 2026
@@ -110,6 +111,16 @@ PROVIDER_LIMITS = {
     ProviderType.SCALEWAY: {
         "free_tokens": 1000000,
         "notes": "1M free tokens.",
+    },
+    ProviderType.LONGCAT: {
+        "models": {
+            "LongCat-Flash-Chat": {"max_tokens": 262144},
+            "LongCat-Flash-Thinking-2601": {"max_tokens": 262144},
+            "LongCat-Flash-Lite": {"max_tokens": 262144},
+            "LongCat-2.0-Preview": {"max_tokens": 128000},
+            "LongCat-Flash-Omni-2603": {"max_tokens": 262144},
+        },
+        "notes": "Free. OpenAI and Anthropic compatible. LongCat series models only.",
     },
 }
 
@@ -200,6 +211,7 @@ class ProviderAccount:
             ProviderType.NEBIUS: "https://api.studio.nebius.ai/v1",
             ProviderType.HYPERBOLIC: "https://api.hyperbolic.xyz/v1",
             ProviderType.SCALEWAY: "https://api.scaleway.ai/v1",
+            ProviderType.LONGCAT: "https://api.longcat.chat/openai/v1",
         }
         return defaults.get(self.provider_type, "")
 
