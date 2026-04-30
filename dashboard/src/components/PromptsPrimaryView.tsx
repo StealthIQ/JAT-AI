@@ -1,0 +1,302 @@
+import { type ReactNode, useCallback, useEffect, useState } from "react";
+
+import { usePromptLibrary } from "../app/hooks/usePromptLibrary";
+import { SidebarPromptsList } from "./SidebarPromptsList";
+import { type PromptCategory, type TemplateOption, TEMPLATES, textToXml } from "./prompt-templates";
+import { ActionButton } from "./ui/ActionButton";
+import { MarkdownContent } from "./ui/MarkdownContent";
+
+type PromptsPrimaryViewProps = {
+  enabled: boolean;
+  onSidebarContent?: (content: ReactNode) => void;
+};
+
+export const PromptsPrimaryView = ({ enabled, onSidebarContent }: PromptsPrimaryViewProps) => {
+  const {
+    prompts,
+    selectedPromptName,
+    selectedPromptDetail: selectedPrompt,
+    isLoadingPrompts,
+    isLoadingDetail,
+    isEditing,
+    editDraft,
+    errorMessage,
+    refreshPrompts,
+    selectPrompt: selectPromptLibraryItem,
+    deletePrompt: deletePromptLibraryItem,
+    startEditing: onStartEditing,
+    cancelEditing: onCancelEditing,
+    setEditDraft: onSetEditDraft,
+    submitEdit: onSubmitEdit,
+  } = usePromptLibrary({ enabled });
+
+  const [showXml, setShowXml] = useState(false);
+  const [showTemplatePopup, setShowTemplatePopup] = useState(false);
+  const [newPromptMode, setNewPromptMode] = useState(false);
+  const [newCategory, setNewCategory] = useState<PromptCategory>("general");
+  const [newName, setNewName] = useState("");
+  const [newContent, setNewContent] = useState("");
+  const [newXmlContent, setNewXmlContent] = useState("");
+  const [newSaving, setNewSaving] = useState(false);
+
+  const onDelete = useCallback(() => {
+    if (selectedPromptName) return deletePromptLibraryItem(selectedPromptName);
+    return Promise.resolve(false);
+  }, [selectedPromptName, deletePromptLibraryItem]);
+
+  const onRefresh = refreshPrompts;
+
+  const handleSelectTemplate = (template: TemplateOption) => {
+    setNewCategory(template.category);
+    setNewName("");
+    setNewContent(template.starter);
+    setNewXmlContent(textToXml("untitled", template.starter || "[your instructions here]", template.category));
+    setShowTemplatePopup(false);
+    setNewPromptMode(true);
+  };
+
+  const handleSaveNewPrompt = useCallback(async () => {
+    const contentToSave = showXml ? newXmlContent : newContent;
+    if (!newName.trim() || !contentToSave.trim()) return;
+    setNewSaving(true);
+    try {
+      const res = await fetch("/api/prompts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newName.trim(),
+          content: contentToSave.trim(),
+          source: "user",
+          category: newCategory,
+          is_xml: showXml,
+        }),
+      });
+      if (res.ok) {
+        setNewPromptMode(false);
+        setNewName("");
+        setNewContent("");
+        setNewXmlContent("");
+        void onRefresh();
+      }
+    } finally {
+      setNewSaving(false);
+    }
+  }, [newName, newContent, newXmlContent, newCategory, showXml, onRefresh]);
+
+  const sidebarContent = (
+    <SidebarPromptsList
+      prompts={prompts}
+      selectedPromptName={selectedPromptName}
+      isLoadingPrompts={isLoadingPrompts}
+      onSelectPrompt={selectPromptLibraryItem}
+      onRefresh={() => { void refreshPrompts(); }}
+      onNewPrompt={() => { setShowTemplatePopup(true); }}
+      activeTerminalId={null}
+      onRestoreTerminal={() => { if (newPromptMode) setNewPromptMode(true); }}
+      onCloseTerminal={() => { setNewPromptMode(false); }}
+    />
+  );
+
+  useEffect(() => {
+    onSidebarContent?.(sidebarContent);
+    return () => onSidebarContent?.(null);
+  }, [prompts, selectedPromptName, isLoadingPrompts, newPromptMode]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const promptCategory: PromptCategory = selectedPrompt?.source === "user" ? "skill" : "general";
+
+  return (
+    <section className="prompts-view" aria-label="Prompts primary view">
+      {showTemplatePopup && (
+        <div className="prompts-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setShowTemplatePopup(false); }}>
+          <div className="prompts-template-popup">
+            <header className="prompts-template-popup-header">
+              <h3>New Prompt</h3>
+              <button type="button" className="prompts-popup-close" onClick={() => setShowTemplatePopup(false)}>X</button>
+            </header>
+            <div className="prompts-template-popup-body">
+              <div className="prompts-template-group">
+                <h4 className="prompts-template-group-title">General Prompts</h4>
+                <p className="prompts-template-group-desc">Broad tasks like reviews, analysis, and refactoring</p>
+                {TEMPLATES.filter((t) => t.category === "general").map((t) => (
+                  <button key={t.id} type="button" className="prompts-template-item" onClick={() => handleSelectTemplate(t)}>
+                    <span className="prompts-template-item-label">{t.label}</span>
+                    <span className="prompts-template-item-desc">{t.description}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="prompts-template-group">
+                <h4 className="prompts-template-group-title">Skill Prompts</h4>
+                <p className="prompts-template-group-desc">Specific skills with scope isolation and quality gates</p>
+                {TEMPLATES.filter((t) => t.category === "skill").map((t) => (
+                  <button key={t.id} type="button" className="prompts-template-item" onClick={() => handleSelectTemplate(t)}>
+                    <span className="prompts-template-item-label">{t.label}</span>
+                    <span className="prompts-template-item-desc">{t.description}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {newPromptMode && (
+        <div className="prompts-create-form">
+          <header className="prompts-terminal-header">
+            <button type="button" className="prompts-terminal-back" onClick={() => setNewPromptMode(false)}>Back</button>
+            <span className="prompts-terminal-label">
+              <strong>{newCategory === "skill" ? "New Skill" : "New Prompt"}</strong>
+            </span>
+            <button
+              type="button"
+              className={`prompts-toggle-btn prompts-toggle-btn--yellow${showXml ? " prompts-toggle-btn--active" : ""}`}
+              onClick={() => {
+                if (!showXml) setNewXmlContent(textToXml(newName || "untitled", newContent || "[your instructions here]", newCategory));
+                setShowXml((v) => !v);
+              }}
+            >
+              {showXml ? "Text" : "XML"}
+            </button>
+            <button
+              type="button"
+              className="prompts-toggle-btn prompts-toggle-btn--yellow"
+              onClick={() => {
+                const text = showXml ? newXmlContent : textToXml(newName || "untitled", newContent || "[your instructions here]", newCategory);
+                void navigator.clipboard.writeText(text);
+              }}
+            >
+              Copy
+            </button>
+          </header>
+          <div className="prompts-create-body">
+            <label className="prompts-create-field">
+              <span>Name</span>
+              <input
+                className="prompts-create-input"
+                placeholder="e.g. security-audit, add-feature"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                autoFocus
+              />
+            </label>
+            {showXml ? (
+              <label className="prompts-create-field">
+                <span>XML (sent to AI)</span>
+                <textarea
+                  className="prompts-create-textarea prompts-create-textarea--xml"
+                  value={newXmlContent}
+                  onChange={(e) => setNewXmlContent(e.target.value)}
+                  rows={14}
+                  spellCheck={false}
+                />
+              </label>
+            ) : (
+              <label className="prompts-create-field">
+                <span>Instructions</span>
+                <textarea
+                  className="prompts-create-textarea"
+                  placeholder="Write your instructions in plain text..."
+                  value={newContent}
+                  onChange={(e) => setNewContent(e.target.value)}
+                  rows={14}
+                  spellCheck={false}
+                />
+              </label>
+            )}
+            <div className="prompts-create-actions">
+              <button type="button" className="prompts-create-cancel" onClick={() => setNewPromptMode(false)}>Cancel</button>
+              <button
+                type="button"
+                className="prompts-create-save"
+                disabled={newSaving || !newName.trim() || !newContent.trim()}
+                onClick={() => void handleSaveNewPrompt()}
+              >
+                {newSaving ? "Saving..." : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!newPromptMode && !showTemplatePopup && (
+        <>
+          {errorMessage ? <p className="prompts-error">{errorMessage}</p> : null}
+          {isLoadingDetail ? (
+            <p className="prompts-empty">Loading prompt...</p>
+          ) : selectedPrompt ? (
+            <div className="prompts-detail">
+              <header className="prompts-detail-header">
+                <div className="prompts-detail-header-left">
+                  <h3 className="prompts-detail-name">{selectedPrompt.name}</h3>
+                  <span className="prompts-detail-source-badge" data-source={selectedPrompt.source}>
+                    {selectedPrompt.source === "user" ? "Skill" : "Built-in"}
+                  </span>
+                  <button
+                    type="button"
+                    className={`prompts-toggle-btn prompts-toggle-btn--yellow${showXml ? " prompts-toggle-btn--active" : ""}`}
+                    onClick={() => setShowXml((v) => !v)}
+                  >
+                    {showXml ? "Text" : "XML"}
+                  </button>
+                  <button
+                    type="button"
+                    className="prompts-toggle-btn prompts-toggle-btn--yellow"
+                    onClick={() => {
+                      const text = showXml
+                        ? textToXml(selectedPrompt.name, selectedPrompt.content, promptCategory)
+                        : selectedPrompt.content;
+                      void navigator.clipboard.writeText(text);
+                    }}
+                  >
+                    Copy
+                  </button>
+                </div>
+                {selectedPrompt.source === "user" && (
+                  <div className="prompts-detail-header-actions">
+                    {isEditing ? (
+                      <>
+                        <ActionButton onClick={() => { void onSubmitEdit(); }}>Save</ActionButton>
+                        <ActionButton onClick={onCancelEditing}>Cancel</ActionButton>
+                      </>
+                    ) : (
+                      <>
+                        <ActionButton onClick={() => {
+                          if (showXml) onSetEditDraft(textToXml(selectedPrompt.name, selectedPrompt.content, promptCategory));
+                          onStartEditing();
+                        }}>Edit</ActionButton>
+                        <ActionButton onClick={() => { void onDelete(); }}>Delete</ActionButton>
+                      </>
+                    )}
+                  </div>
+                )}
+              </header>
+              {isEditing ? (
+                <textarea
+                  className={`prompts-edit-area${showXml ? " prompts-edit-area--xml" : ""}`}
+                  value={editDraft}
+                  onChange={(e) => { onSetEditDraft(e.target.value); }}
+                  spellCheck={false}
+                />
+              ) : (
+                <div className="prompts-content">
+                  {showXml ? (
+                    <textarea
+                      className="prompts-edit-area prompts-edit-area--xml"
+                      value={textToXml(selectedPrompt.name, selectedPrompt.content, promptCategory)}
+                      readOnly
+                    />
+                  ) : (
+                    <MarkdownContent content={selectedPrompt.content} />
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="prompts-empty-state">
+              <p className="prompts-empty">Select a prompt from the sidebar, or create a new one.</p>
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  );
+};

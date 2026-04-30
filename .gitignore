@@ -11,5 +11,4 @@ __pycache__/
 *.pyc
 _*.py
 _*.txt
-dashboard
 .vscode

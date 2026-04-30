@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import os
 from contextlib import asynccontextmanager
 
+import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -9,6 +11,11 @@ from pydantic import BaseModel
 from api.providers import router as providers_router
 from clients.supabase import SupabaseClient
 from config import load_settings
+
+
+def _now() -> str:
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).isoformat()
 
 
 settings = load_settings()
@@ -233,9 +240,62 @@ async def get_codex_usage():
     return {"status": "unavailable", "source": "none"}
 
 
+async def _fetch_repo_commits(client: httpx.AsyncClient, repo_name: str, headers: dict) -> list[dict]:
+    res = await client.get(f"https://api.github.com/repos/{repo_name}/commits?per_page=10", headers=headers)
+    if res.status_code != 200:
+        return []
+    commits = []
+    for c in res.json()[:10]:
+        commit_data = c.get("commit", {})
+        author = commit_data.get("author", {})
+        commits.append({
+            "hash": c.get("sha", ""),
+            "shortHash": c.get("sha", "")[:7],
+            "subject": commit_data.get("message", "").split("\n")[0],
+            "authorName": author.get("name", ""),
+            "authorEmail": author.get("email", ""),
+            "authoredAt": author.get("date", ""),
+            "body": commit_data.get("message", ""),
+            "filesChanged": 0,
+            "insertions": 0,
+            "deletions": 0,
+        })
+    return commits
+
+
 @app.get("/api/github/summary")
 async def get_github_summary():
-    return {"status": "ok", "repo": "", "stargazerCount": 0, "openIssueCount": 0, "openPullRequestCount": 0, "commitsPerDay": [], "recentCommits": []}
+    token = settings.github_token
+    owner = os.getenv("DEFAULT_REPO_OWNER", "iceyxsm")
+    if not token:
+        return {"status": "error", "source": "none", "fetchedAt": _now(), "message": "No GitHub token configured", "commitsPerDay": [], "recentCommits": []}
+    headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
+    async with httpx.AsyncClient() as client:
+        repos_res = await client.get(f"https://api.github.com/users/{owner}/repos?per_page=10&sort=pushed", headers=headers)
+        repos = repos_res.json() if repos_res.status_code == 200 else []
+        total_stars = sum(r.get("stargazers_count", 0) for r in repos)
+        total_issues = sum(r.get("open_issues_count", 0) for r in repos)
+        recent_commits: list[dict] = []
+        commits_by_day: dict[str, int] = {}
+        for repo in repos[:5]:
+            repo_commits = await _fetch_repo_commits(client, repo.get("full_name", ""), headers)
+            for c in repo_commits:
+                date = (c.get("authoredAt") or "")[:10]
+                if date:
+                    commits_by_day[date] = commits_by_day.get(date, 0) + 1
+            recent_commits.extend(repo_commits)
+        commits_per_day = [{"date": d, "count": c} for d, c in sorted(commits_by_day.items())]
+        return {
+            "status": "ok",
+            "source": "gh-cli",
+            "fetchedAt": _now(),
+            "repo": f"{owner} ({len(repos)} repos)",
+            "stargazerCount": total_stars,
+            "openIssueCount": total_issues,
+            "openPullRequestCount": 0,
+            "commitsPerDay": commits_per_day[-30:],
+            "recentCommits": recent_commits[:50],
+        }
 
 
 @app.get("/api/analytics/usage-heatmap")
