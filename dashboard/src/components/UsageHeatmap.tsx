@@ -74,9 +74,9 @@ const buildBars = (days: UsageDayEntry[], keys: string[], mode: BarSegmentMode):
 };
 
 const buildYTicks = (maxTokens: number): { value: number; label: string }[] => {
-  if (maxTokens === 0) return [];
+  const effectiveMax = maxTokens > 0 ? maxTokens : 5;
   const ticks: { value: number; label: string }[] = [];
-  const step = maxTokens / 4;
+  const step = effectiveMax / 4;
   for (let i = 0; i <= 4; i++) {
     const value = step * i;
     ticks.push({ value, label: formatTokenCount(Math.round(value)) });
@@ -219,8 +219,9 @@ const BarChartView = ({
       aria-label="Token usage bar chart"
     >
       {yTicks.map((tick) => {
+        const effectiveMax = maxTokens > 0 ? maxTokens : 5;
         const y =
-          TOP_PAD + chartHeight - (maxTokens > 0 ? (tick.value / maxTokens) * chartHeight : 0);
+          TOP_PAD + chartHeight - (tick.value / effectiveMax) * chartHeight;
         return (
           <g key={tick.value}>
             <line
@@ -326,7 +327,7 @@ const MONTH_LABELS = [
   "Dec",
 ];
 
-const INTENSITY_COLORS = ["transparent", "#3d2008", "#6b3a0e", "#b5611a", "#d7a622"];
+const INTENSITY_COLORS = ["#1a1f2e", "#0e3d4f", "#0c6b7a", "#00b8d4", "#00e5ff"];
 
 type HeatmapCell = {
   date: string;
@@ -520,7 +521,16 @@ export const UsageBarChart = ({ data, isLoading, onRefresh }: UsageChartSectionP
   const barPanel = usePanelSize();
   const heatmapPanel = usePanelSize();
 
-  const days = data?.days ?? [];
+  const rawDays = data?.days ?? [];
+  const days = useMemo(() => {
+    if (rawDays.length > 0) return rawDays;
+    const now = new Date();
+    return Array.from({ length: 30 }, (_, i) => {
+      const d = new Date(now);
+      d.setDate(d.getDate() - 29 + i);
+      return { date: d.toISOString().slice(0, 10), totalTokens: 0, sessions: 0, projects: [], models: [] };
+    });
+  }, [rawDays]);
   const projects = data?.projects ?? [];
   const models = data?.models ?? [];
 
@@ -553,7 +563,6 @@ export const UsageBarChart = ({ data, isLoading, onRefresh }: UsageChartSectionP
       firstDay,
     );
     const avgPerSession = totalSessions > 0 ? Math.round(totalTokens / totalSessions) : 0;
-    const topModel = models[0] ?? "—";
     const topProject = projects[0] ?? "—";
 
     let streak = 0;
@@ -569,8 +578,8 @@ export const UsageBarChart = ({ data, isLoading, onRefresh }: UsageChartSectionP
       }
     }
 
-    return { peakDay, avgPerSession, topModel, topProject, maxStreak };
-  }, [days, totalTokens, totalSessions, models, projects]);
+    return { peakDay, avgPerSession, topProject, maxStreak };
+  }, [days, totalTokens, totalSessions, projects]);
 
   return (
     <section className="usage-heatmap" aria-label="Sessions usage chart">
@@ -611,14 +620,14 @@ export const UsageBarChart = ({ data, isLoading, onRefresh }: UsageChartSectionP
             className={`usage-chart-bar-segment-btn${segmentMode === "project" ? " is-active" : ""}`}
             onClick={() => setSegmentMode("project")}
           >
-            Project
+            Repo
           </button>
           <button
             type="button"
             className={`usage-chart-bar-segment-btn${segmentMode === "model" ? " is-active" : ""}`}
             onClick={() => setSegmentMode("model")}
           >
-            Model
+            Status
           </button>
         </div>
         <div className="usage-chart-left-stack">
@@ -672,12 +681,12 @@ export const UsageBarChart = ({ data, isLoading, onRefresh }: UsageChartSectionP
                 <dd>{formatTokenCount(stats.avgPerSession)}</dd>
               </div>
               <div className="usage-chart-stat">
-                <dt>Top Model</dt>
-                <dd>{stats.topModel}</dd>
+                <dt>Top Repo</dt>
+                <dd>{stats.topProject}</dd>
               </div>
               <div className="usage-chart-stat">
-                <dt>Top Project</dt>
-                <dd>{stats.topProject}</dd>
+                <dt>Sessions Today</dt>
+                <dd>{days[days.length - 1]?.sessions ?? 0}</dd>
               </div>
               <div className="usage-chart-stat">
                 <dt>Best Streak</dt>

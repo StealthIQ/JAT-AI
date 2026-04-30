@@ -270,24 +270,25 @@ async def get_usage_heatmap():
     now = datetime.now(timezone.utc)
     days: list[dict] = []
     projects: set[str] = set()
-    models: set[str] = set()
     sessions_by_date: dict[str, list[dict]] = {}
     if jules_key:
-        sessions_by_date, projects, models = await _fetch_jules_sessions(headers_jules)
+        sessions_by_date, projects, _ = await _fetch_jules_sessions(headers_jules)
     for i in range(30):
         date = (now - timedelta(days=29 - i)).strftime("%Y-%m-%d")
         day_sessions = sessions_by_date.get(date, [])
         day_projects: dict[str, int] = {}
         for s in day_sessions:
             day_projects[s["repo"]] = day_projects.get(s["repo"], 0) + 1
+        count = len(day_sessions)
         days.append({
             "date": date,
-            "totalTokens": len(day_sessions) * 1000,
-            "sessions": len(day_sessions),
-            "projects": [{"key": k, "tokens": v * 1000} for k, v in day_projects.items()],
-            "models": [{"key": "jules-ultra", "tokens": len(day_sessions) * 1000}] if day_sessions else [],
+            "totalTokens": count,
+            "sessions": count,
+            "projects": [{"key": k, "tokens": v} for k, v in day_projects.items()] if day_projects else [{"key": "none", "tokens": 0}],
+            "models": [{"key": "sessions", "tokens": count}],
         })
-    return {"days": days, "projects": sorted(projects), "models": sorted(models)}
+    all_projects = sorted(projects) if projects else ["none"]
+    return {"days": days, "projects": all_projects, "models": ["sessions"]}
 
 
 @app.get("/api/monitor/feed")
