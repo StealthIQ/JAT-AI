@@ -53,7 +53,7 @@
 
 .console-shell .active-agents-agent-row--root {
   background: #121a23;
-  border-left-color: #d6a21a;
+  border-left-color: #00e5ff;
 }
 
 .console-shell .active-agents-codex-usage {
@@ -62,7 +62,7 @@
 }
 
 .console-shell .active-agents-codex-usage-meta {
-  color: #d6a21a;
+  color: #00e5ff;
   font-size: 0.7rem;
 }
 
@@ -84,7 +84,7 @@
 }
 
 .console-shell .empty-state h2 {
-  color: #d6a21a;
+  color: #00e5ff;
   font-size: 1rem;
 }
 
@@ -111,7 +111,7 @@
 }
 
 .console-shell .terminal-column-header h2 {
-  color: #d6a21a;
+  color: #00e5ff;
   font-size: 0.78rem;
 }
 
@@ -148,8 +148,8 @@
 .console-shell .terminal-header {
   background: linear-gradient(
     180deg,
-    color-mix(in srgb, var(--accent-primary) 90%, #ffd89d 10%) 0%,
-    color-mix(in srgb, var(--accent-primary) 78%, #d9851c 22%) 100%
+    color-mix(in srgb, var(--accent-primary) 90%, #b3f5ff 10%) 0%,
+    color-mix(in srgb, var(--accent-primary) 78%, #0891b2 22%) 100%
   );
   border-bottom-color: color-mix(in srgb, #121212 35%, transparent);
   color: #121212;
@@ -158,8 +158,8 @@
 .console-shell .terminal-pane--selected .terminal-header {
   background: linear-gradient(
     180deg,
-    color-mix(in srgb, var(--accent-primary) 90%, #ffd89d 10%) 0%,
-    color-mix(in srgb, var(--accent-primary) 78%, #d9851c 22%) 100%
+    color-mix(in srgb, var(--accent-primary) 90%, #b3f5ff 10%) 0%,
+    color-mix(in srgb, var(--accent-primary) 78%, #0891b2 22%) 100%
   );
   border-bottom-color: color-mix(in srgb, #121212 35%, transparent);
   color: #121212;
@@ -198,13 +198,13 @@
 
 .console-shell .pill.queued,
 .console-shell .status-badge.queued {
-  background: #d6a21a;
+  background: #00e5ff;
   color: #161103;
 }
 
 .console-shell .pill.blocked,
 .console-shell .status-badge.blocked {
-  background: #8c0b12;
+  background: #7c3aed;
   color: #ffdddd;
 }
 
@@ -246,7 +246,7 @@
 }
 
 .console-telemetry-source {
-  color: #d6a21a;
+  color: #00e5ff;
   font-size: 0.78rem;
   line-height: 1;
 }
@@ -267,7 +267,7 @@ a.console-telemetry-item:focus-visible .console-telemetry-snippet {
 }
 
 a.console-telemetry-item:focus-visible {
-  outline: 1px solid color-mix(in srgb, var(--accent-primary) 70%, #f0cf75);
+  outline: 1px solid color-mix(in srgb, var(--accent-primary) 70%, #67e8f9);
   outline-offset: 2px;
 }
 

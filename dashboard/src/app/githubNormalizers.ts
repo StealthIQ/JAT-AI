@@ -33,6 +33,8 @@ const normalizeGitHubRecentCommit = (value: unknown): GitHubRecentCommit | null 
   const authorEmail = asString(record.authorEmail)?.trim() ?? "";
   const authoredAt = asString(record.authoredAt)?.trim();
   const body = asString(record.body)?.trim() ?? "";
+  const url = asString(record.url)?.trim() ?? "";
+  const repo = asString(record.repo)?.trim() ?? "";
   const filesChanged = asNumber(record.filesChanged) ?? 0;
   const insertions = asNumber(record.insertions) ?? 0;
   const deletions = asNumber(record.deletions) ?? 0;
@@ -48,6 +50,8 @@ const normalizeGitHubRecentCommit = (value: unknown): GitHubRecentCommit | null 
     authorEmail,
     authoredAt,
     body,
+    url,
+    repo,
     filesChanged,
     insertions,
     deletions,

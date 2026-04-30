@@ -39,8 +39,8 @@
 
 .monitor-header-roll {
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--accent-primary) 55%, #4f3c10);
-  background: color-mix(in srgb, #0a0b0d 78%, #2b1e06 22%);
+  border: 1px solid color-mix(in srgb, var(--accent-primary) 55%, #0e4f5c);
+  background: color-mix(in srgb, #0a0b0d 78%, #0a2e3d 22%);
   padding: 0.28rem 0;
 }
 
@@ -133,7 +133,7 @@
 }
 
 .monitor-subtab[data-active="true"] {
-  border-color: color-mix(in srgb, var(--accent-primary) 62%, #6b5210);
+  border-color: color-mix(in srgb, var(--accent-primary) 62%, #0e4f5c);
   background: var(--accent-primary);
   color: #111216;
 }
@@ -181,7 +181,7 @@
 
 .monitor-panel h3 {
   margin: 0;
-  color: #d7a622;
+  color: #00e5ff;
   font-size: 0.86rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -224,7 +224,7 @@
 
 .monitor-section-label {
   margin: 0;
-  color: #d7a622;
+  color: #00e5ff;
   font-size: 0.82rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -264,7 +264,7 @@
 
 .monitor-input:focus-visible,
 .monitor-textarea:focus-visible {
-  outline: 1px solid color-mix(in srgb, var(--accent-primary) 82%, #f0cf75);
+  outline: 1px solid color-mix(in srgb, var(--accent-primary) 82%, #67e8f9);
   outline-offset: 1px;
 }
 
@@ -364,13 +364,13 @@
 }
 
 .monitor-timeframe-option[data-active="true"] {
-  border-color: color-mix(in srgb, var(--accent-primary) 62%, #6b5210);
-  background: color-mix(in srgb, var(--accent-primary) 82%, #f3cd74 18%);
+  border-color: color-mix(in srgb, var(--accent-primary) 62%, #0e4f5c);
+  background: color-mix(in srgb, var(--accent-primary) 82%, #67e8f9 18%);
   color: #111216;
 }
 
 .monitor-timeframe-option:focus-visible {
-  outline: 1px solid color-mix(in srgb, var(--accent-primary) 82%, #f0cf75);
+  outline: 1px solid color-mix(in srgb, var(--accent-primary) 82%, #67e8f9);
   outline-offset: 1px;
 }
 

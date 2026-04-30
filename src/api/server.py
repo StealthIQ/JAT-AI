@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from contextlib import asynccontextmanager
 
 import httpx
@@ -9,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from api.providers import router as providers_router
+from api.github import router as github_router
 from clients.supabase import SupabaseClient
 from config import load_settings
 
@@ -35,6 +35,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(providers_router)
+app.include_router(github_router)
 
 
 class PromptCreate(BaseModel):
@@ -197,9 +198,6 @@ async def get_usage():
     }
 
 
-# --- Static endpoints and UI write catch-alls ---
-# Octogent UI expects these but we don't persist them yet
-
 @app.get("/api/ui-state")
 async def get_ui_state():
     return {
@@ -240,67 +238,56 @@ async def get_codex_usage():
     return {"status": "unavailable", "source": "none"}
 
 
-async def _fetch_repo_commits(client: httpx.AsyncClient, repo_name: str, headers: dict) -> list[dict]:
-    res = await client.get(f"https://api.github.com/repos/{repo_name}/commits?per_page=10", headers=headers)
-    if res.status_code != 200:
-        return []
-    commits = []
-    for c in res.json()[:10]:
-        commit_data = c.get("commit", {})
-        author = commit_data.get("author", {})
-        commits.append({
-            "hash": c.get("sha", ""),
-            "shortHash": c.get("sha", "")[:7],
-            "subject": commit_data.get("message", "").split("\n")[0],
-            "authorName": author.get("name", ""),
-            "authorEmail": author.get("email", ""),
-            "authoredAt": author.get("date", ""),
-            "body": commit_data.get("message", ""),
-            "filesChanged": 0,
-            "insertions": 0,
-            "deletions": 0,
-        })
-    return commits
-
-
-@app.get("/api/github/summary")
-async def get_github_summary():
-    token = settings.github_token
-    owner = os.getenv("DEFAULT_REPO_OWNER", "iceyxsm")
-    if not token:
-        return {"status": "error", "source": "none", "fetchedAt": _now(), "message": "No GitHub token configured", "commitsPerDay": [], "recentCommits": []}
-    headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
-    async with httpx.AsyncClient() as client:
-        repos_res = await client.get(f"https://api.github.com/users/{owner}/repos?per_page=10&sort=pushed", headers=headers)
-        repos = repos_res.json() if repos_res.status_code == 200 else []
-        total_stars = sum(r.get("stargazers_count", 0) for r in repos)
-        total_issues = sum(r.get("open_issues_count", 0) for r in repos)
-        recent_commits: list[dict] = []
-        commits_by_day: dict[str, int] = {}
-        for repo in repos[:5]:
-            repo_commits = await _fetch_repo_commits(client, repo.get("full_name", ""), headers)
-            for c in repo_commits:
-                date = (c.get("authoredAt") or "")[:10]
-                if date:
-                    commits_by_day[date] = commits_by_day.get(date, 0) + 1
-            recent_commits.extend(repo_commits)
-        commits_per_day = [{"date": d, "count": c} for d, c in sorted(commits_by_day.items())]
-        return {
-            "status": "ok",
-            "source": "gh-cli",
-            "fetchedAt": _now(),
-            "repo": f"{owner} ({len(repos)} repos)",
-            "stargazerCount": total_stars,
-            "openIssueCount": total_issues,
-            "openPullRequestCount": 0,
-            "commitsPerDay": commits_per_day[-30:],
-            "recentCommits": recent_commits[:50],
-        }
+async def _fetch_jules_sessions(headers: dict) -> tuple[dict[str, list[dict]], set[str], set[str]]:
+    sessions_by_date: dict[str, list[dict]] = {}
+    projects: set[str] = set()
+    models: set[str] = set()
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            res = await client.get("https://jules.googleapis.com/v1alpha/sessions?pageSize=100", headers=headers)
+            if res.status_code == 200:
+                for s in res.json().get("sessions", []):
+                    date = s.get("createTime", "")[:10]
+                    if not date:
+                        continue
+                    source = s.get("sourceContext", {}).get("source", "")
+                    repo = source.replace("sources/github/", "") if source else "unknown"
+                    projects.add(repo)
+                    models.add("jules-ultra")
+                    if date not in sessions_by_date:
+                        sessions_by_date[date] = []
+                    sessions_by_date[date].append({"repo": repo})
+    except (httpx.ReadTimeout, httpx.ConnectTimeout):
+        pass
+    return sessions_by_date, projects, models
 
 
 @app.get("/api/analytics/usage-heatmap")
 async def get_usage_heatmap():
-    return {"days": [], "projects": [], "models": []}
+    jules_key = settings.jules_api_key
+    headers_jules = {"X-Goog-Api-Key": jules_key} if jules_key else {}
+    from datetime import datetime, timezone, timedelta
+    now = datetime.now(timezone.utc)
+    days: list[dict] = []
+    projects: set[str] = set()
+    models: set[str] = set()
+    sessions_by_date: dict[str, list[dict]] = {}
+    if jules_key:
+        sessions_by_date, projects, models = await _fetch_jules_sessions(headers_jules)
+    for i in range(30):
+        date = (now - timedelta(days=29 - i)).strftime("%Y-%m-%d")
+        day_sessions = sessions_by_date.get(date, [])
+        day_projects: dict[str, int] = {}
+        for s in day_sessions:
+            day_projects[s["repo"]] = day_projects.get(s["repo"], 0) + 1
+        days.append({
+            "date": date,
+            "totalTokens": len(day_sessions) * 1000,
+            "sessions": len(day_sessions),
+            "projects": [{"key": k, "tokens": v * 1000} for k, v in day_projects.items()],
+            "models": [{"key": "jules-ultra", "tokens": len(day_sessions) * 1000}] if day_sessions else [],
+        })
+    return {"days": days, "projects": sorted(projects), "models": sorted(models)}
 
 
 @app.get("/api/monitor/feed")

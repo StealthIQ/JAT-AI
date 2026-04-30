@@ -284,7 +284,7 @@
 
 .usage-heatmap-tooltip {
   position: absolute;
-  border: 1px solid color-mix(in srgb, var(--accent-primary) 58%, #6b5210);
+  border: 1px solid color-mix(in srgb, var(--accent-primary) 58%, #0e4f5c);
   background: color-mix(in srgb, #0d1219 92%, #2a1f08 8%);
   padding: 0.42rem 0.52rem;
   z-index: 4;

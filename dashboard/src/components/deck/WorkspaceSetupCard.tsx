@@ -37,7 +37,7 @@ export const WorkspaceSetupCard = ({
     <header className="workspace-setup-card-header">
       <div className="workspace-setup-card-glyph">
         <OctopusGlyph
-          color="#d4a017"
+          color="#7c3aed"
           animation={compact ? "idle" : "walk"}
           expression="happy"
           accessory="none"

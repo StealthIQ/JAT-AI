@@ -291,7 +291,7 @@ export const OctopusNode = ({
         y={glyphH / 2 - 12}
         textAnchor="middle"
         className="canvas-node-label canvas-node-label--tentacle canvas-node-label--always"
-        fill={isOctoboss ? "var(--accent-primary, #d4a017)" : "#faa32c"}
+        fill={isOctoboss ? "var(--accent-primary, #7c3aed)" : "#faa32c"}
       >
         <tspan x="0" dy="0">
           {lines[0]}

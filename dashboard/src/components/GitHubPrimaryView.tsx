@@ -22,7 +22,9 @@ type GitHubPrimaryViewProps = {
   onHoveredGitHubOverviewPointIndexChange: (index: number | null) => void;
 };
 
-const GITHUB_OVERVIEW_GRAPH_VIEWBOX_INSET = 8;
+const GITHUB_OVERVIEW_GRAPH_VIEWBOX_INSET = 16;
+const GITHUB_OVERVIEW_GRAPH_VIEWBOX_BOTTOM = 14;
+const GITHUB_OVERVIEW_GRAPH_Y_PADDING = 12;
 const GITHUB_RECENT_COMMITS_LIMIT = 50;
 
 const formatSparkDate = (date: string): string => {
@@ -38,11 +40,12 @@ const buildCommitYTicks = (series: GitHubCommitSparkPoint[]): { count: number; y
   const minCount = Math.min(...counts);
   const range = Math.max(1, maxCount - minCount);
   const H = GITHUB_OVERVIEW_GRAPH_HEIGHT;
+  const pad = GITHUB_OVERVIEW_GRAPH_Y_PADDING;
   const tickCount = 4;
   const ticks: { count: number; y: number }[] = [];
   for (let i = 0; i <= tickCount; i++) {
     const count = Math.round(minCount + range * (i / tickCount));
-    const y = H - ((count - minCount) / range) * H;
+    const y = pad + (H - 2 * pad) - ((count - minCount) / range) * (H - 2 * pad);
     ticks.push({ count, y });
   }
   return ticks;
@@ -51,11 +54,12 @@ const buildCommitYTicks = (series: GitHubCommitSparkPoint[]): { count: number; y
 const buildAreaPolygonPoints = (series: GitHubCommitSparkPoint[]): string => {
   if (series.length === 0) return "";
   const H = GITHUB_OVERVIEW_GRAPH_HEIGHT;
+  const bottomY = H - GITHUB_OVERVIEW_GRAPH_Y_PADDING;
   const first = series[0];
   const last = series[series.length - 1];
   if (!first || !last) return "";
   const linePoints = series.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
-  return `${first.x.toFixed(1)},${H} ${linePoints} ${last.x.toFixed(1)},${H}`;
+  return `${first.x.toFixed(1)},${bottomY} ${linePoints} ${last.x.toFixed(1)},${bottomY}`;
 };
 
 const formatRecentCommitTimestamp = (value: string) => {
@@ -106,6 +110,27 @@ export const GitHubPrimaryView = ({
     setCommitTooltipY(null);
   }, []);
 
+  const [statPopup, setStatPopup] = useState<"stars" | "issues" | "prs" | "commits" | null>(null);
+  const [statPopupData, setStatPopupData] = useState<any[]>([]);
+  const [statPopupLoading, setStatPopupLoading] = useState(false);
+
+  const openStatPopup = useCallback(async (type: "stars" | "issues" | "prs" | "commits") => {
+    setStatPopup(type);
+    setStatPopupLoading(true);
+    setStatPopupData([]);
+    const endpoint = type === "stars" ? "/api/github/stars" : type === "issues" ? "/api/github/issues" : "/api/github/pulls";
+    if (type === "commits") {
+      setStatPopupData(githubRecentCommits.map((c: any) => ({ title: c.subject, repo: c.repo || "", url: c.url || "", created: c.authoredAt?.slice(0, 10) || "" })));
+      setStatPopupLoading(false);
+      return;
+    }
+    try {
+      const res = await fetch(endpoint);
+      if (res.ok) setStatPopupData(await res.json());
+    } catch { /* silent */ }
+    setStatPopupLoading(false);
+  }, [githubRecentCommits]);
+
   useEffect(() => {
     if (pinnedCommitHash === null) return;
 
@@ -128,7 +153,7 @@ export const GitHubPrimaryView = ({
     () => buildAreaPolygonPoints(githubOverviewGraphSeries),
     [githubOverviewGraphSeries],
   );
-  const xLabelStep = Math.max(1, Math.ceil(githubOverviewGraphSeries.length / 6));
+  const xLabelStep = Math.max(1, Math.ceil(githubOverviewGraphSeries.length / 10));
 
   const hoveredGitHubOverviewPoint =
     hoveredGitHubOverviewPointIndex !== null
@@ -209,7 +234,7 @@ export const GitHubPrimaryView = ({
                   }}
                   viewBox={`${-GITHUB_OVERVIEW_GRAPH_VIEWBOX_INSET} ${-GITHUB_OVERVIEW_GRAPH_VIEWBOX_INSET} ${
                     GITHUB_OVERVIEW_GRAPH_WIDTH + GITHUB_OVERVIEW_GRAPH_VIEWBOX_INSET * 2
-                  } ${GITHUB_OVERVIEW_GRAPH_HEIGHT + GITHUB_OVERVIEW_GRAPH_VIEWBOX_INSET * 2}`}
+                  } ${GITHUB_OVERVIEW_GRAPH_HEIGHT + GITHUB_OVERVIEW_GRAPH_VIEWBOX_INSET + GITHUB_OVERVIEW_GRAPH_VIEWBOX_BOTTOM}`}
                   preserveAspectRatio="none"
                   role="presentation"
                 >
@@ -219,9 +244,9 @@ export const GitHubPrimaryView = ({
                       <stop offset="100%" stopColor="var(--accent-primary)" stopOpacity="0.01" />
                     </linearGradient>
                     <linearGradient id="commitLineGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#fce8a8" />
-                      <stop offset="60%" stopColor="#e8820a" />
-                      <stop offset="100%" stopColor="#ff6a00" />
+                      <stop offset="0%" stopColor="#b3f5ff" />
+                      <stop offset="60%" stopColor="#00e5ff" />
+                      <stop offset="100%" stopColor="#0891b2" />
                     </linearGradient>
                   </defs>
 
@@ -258,7 +283,7 @@ export const GitHubPrimaryView = ({
                         <text
                           key={`xl-${point.date}`}
                           x={point.x}
-                          y={GITHUB_OVERVIEW_GRAPH_HEIGHT + GITHUB_OVERVIEW_GRAPH_VIEWBOX_INSET}
+                          y={GITHUB_OVERVIEW_GRAPH_HEIGHT + 6}
                           className="github-overview-graph-x-label"
                         >
                           {label}
@@ -311,6 +336,8 @@ export const GitHubPrimaryView = ({
                 data-metric="st"
                 data-label="Stars"
                 title="Stars"
+                onClick={() => void openStatPopup("stars")}
+                style={{ cursor: "pointer" }}
               >
                 <dt>
                   <span aria-hidden="true" className="github-overview-stat-icon">
@@ -327,6 +354,8 @@ export const GitHubPrimaryView = ({
                 data-metric="is"
                 data-label="Open issues"
                 title="Open issues"
+                onClick={() => void openStatPopup("issues")}
+                style={{ cursor: "pointer" }}
               >
                 <dt>
                   <span aria-hidden="true" className="github-overview-stat-icon">
@@ -344,6 +373,8 @@ export const GitHubPrimaryView = ({
                 data-metric="pr"
                 data-label="Open PRs"
                 title="Open PRs"
+                onClick={() => void openStatPopup("prs")}
+                style={{ cursor: "pointer" }}
               >
                 <dt>
                   <span aria-hidden="true" className="github-overview-stat-icon">
@@ -360,6 +391,8 @@ export const GitHubPrimaryView = ({
                 data-metric="30d"
                 data-label="Commits (30d)"
                 title="Commits (30d)"
+                onClick={() => void openStatPopup("commits")}
+                style={{ cursor: "pointer" }}
               >
                 <dt>
                   <span aria-hidden="true" className="github-overview-stat-icon">
@@ -489,6 +522,32 @@ export const GitHubPrimaryView = ({
           </aside>
         </div>
       </section>
+
+      {statPopup && (
+        <div className="github-stat-popup-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setStatPopup(null); }}>
+          <div className="github-stat-popup">
+            <header className="github-stat-popup-header">
+              <h3>{statPopup === "stars" ? "Starred Repos" : statPopup === "issues" ? "Open Issues" : statPopup === "prs" ? "Open Pull Requests" : "Recent Commits (30d)"}</h3>
+              <button type="button" onClick={() => setStatPopup(null)}>X</button>
+            </header>
+            <div className="github-stat-popup-body">
+              {statPopupLoading ? <p>Loading...</p> : statPopupData.length === 0 ? <p>None found.</p> : (
+                <ul className="github-stat-popup-list">
+                  {statPopupData.map((item, i) => (
+                    <li key={i} className="github-stat-popup-item">
+                      <span className="github-stat-popup-title">{item.title || item.repo}</span>
+                      {item.repo && item.title && <span className="github-stat-popup-repo">{item.repo}</span>}
+                      {item.created && <span className="github-stat-popup-date">{item.created}</span>}
+                      {item.stars != null && <span className="github-stat-popup-stars">{item.stars} stars</span>}
+                      {item.url && <a href={item.url} target="_blank" rel="noopener noreferrer" className="github-stat-popup-link">Open</a>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 };

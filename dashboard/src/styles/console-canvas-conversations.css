@@ -106,12 +106,12 @@
 }
 
 .conversations-session-item[data-active="true"] {
-  border-color: color-mix(in srgb, var(--accent-primary) 62%, #6b5210);
+  border-color: color-mix(in srgb, var(--accent-primary) 62%, #0e4f5c);
   background: color-mix(in srgb, #19140b 38%, #11161d 62%);
 }
 
 .conversations-session-item:focus-visible {
-  outline: 1px solid color-mix(in srgb, var(--accent-primary) 70%, #e9c56c);
+  outline: 1px solid color-mix(in srgb, var(--accent-primary) 70%, #67e8f9);
   outline-offset: 1px;
 }
 
@@ -496,7 +496,7 @@
 }
 
 .sidebar-conversation-item:focus-visible {
-  outline: 1px solid color-mix(in srgb, var(--accent-primary) 70%, #e9c56c);
+  outline: 1px solid color-mix(in srgb, var(--accent-primary) 70%, #67e8f9);
   outline-offset: 1px;
 }
 

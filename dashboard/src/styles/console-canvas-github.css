@@ -148,7 +148,7 @@
   left: 50%;
   bottom: calc(100% + 0.28rem);
   transform: translateX(-50%);
-  border: 1px solid color-mix(in srgb, var(--accent-primary) 58%, #6b5210);
+  border: 1px solid color-mix(in srgb, var(--accent-primary) 58%, #0e4f5c);
   background: color-mix(in srgb, #0d1219 84%, #2a1f08 16%);
   color: #e9edf4;
   font-size: 0.66rem;
@@ -183,7 +183,7 @@
 }
 
 .github-overview-graph-meta strong {
-  color: #d7a622;
+  color: #00e5ff;
   font-size: 0.74rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -199,8 +199,9 @@
   min-height: 0;
   border: 1px solid color-mix(in srgb, #303949 72%, #1f2733);
   background: #0a0f16;
-  padding: 0.28rem;
+  padding: 0.5rem 0.7rem 0.6rem;
   position: relative;
+  overflow: hidden;
 }
 
 .github-overview-graph-surface svg {
@@ -208,6 +209,7 @@
   height: 100%;
   display: block;
   cursor: crosshair;
+  overflow: visible;
 }
 
 .github-overview-graph-grid {
@@ -243,15 +245,15 @@
 .github-overview-graph-point.is-active,
 .github-overview-graph-point:hover,
 .github-overview-graph-point:focus-visible {
-  fill: color-mix(in srgb, var(--accent-primary) 70%, #fff2c2 30%);
-  stroke: color-mix(in srgb, var(--accent-primary) 62%, #6d5314 38%);
+  fill: color-mix(in srgb, var(--accent-primary) 70%, #b3f5ff 30%);
+  stroke: color-mix(in srgb, var(--accent-primary) 62%, #0e4f5c 38%);
   stroke-width: 2;
 }
 
 .github-overview-graph-tooltip {
   position: absolute;
   transform: translate(-50%, -100%);
-  border: 1px solid color-mix(in srgb, var(--accent-primary) 62%, #6b5210);
+  border: 1px solid color-mix(in srgb, var(--accent-primary) 62%, #0e4f5c);
   background: color-mix(in srgb, #0d1219 84%, #2a1f08 16%);
   color: #e9edf4;
   padding: 0.2rem 0.34rem;
@@ -283,7 +285,7 @@
 
 .github-overview-recent-header h3 {
   margin: 0;
-  color: #d7a622;
+  color: #00e5ff;
   font-size: 0.8rem;
   letter-spacing: 0.07em;
   text-transform: uppercase;
@@ -418,7 +420,7 @@
   right: calc(100% + 0.42rem);
   transform: translateY(-50%);
   z-index: 4;
-  border: 1px solid color-mix(in srgb, var(--accent-primary) 58%, #6b5210);
+  border: 1px solid color-mix(in srgb, var(--accent-primary) 58%, #0e4f5c);
   background: color-mix(in srgb, #0d1219 92%, #2a1f08 8%);
   padding: 0.52rem 0.62rem;
   display: grid;
@@ -543,4 +545,113 @@
   .console-shell .github-view {
     padding: 0;
   }
+}
+
+.github-stat-popup-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+}
+
+.github-stat-popup {
+  width: 480px;
+  max-width: 90vw;
+  max-height: 70vh;
+  background: #0d1117;
+  border: 1px solid #2b2f36;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.github-stat-popup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.8rem 1.2rem;
+  border-bottom: 1px solid #1e2228;
+}
+
+.github-stat-popup-header h3 {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #e6edf3;
+  font-family: var(--font-main);
+}
+
+.github-stat-popup-header button {
+  background: none;
+  border: none;
+  color: #8b949e;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.github-stat-popup-body {
+  padding: 0.8rem 1.2rem;
+  overflow-y: auto;
+  font-size: 0.78rem;
+  color: #b8c2d1;
+}
+
+.github-stat-popup-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.github-stat-popup-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid #1e2228;
+  border-radius: 4px;
+  background: #141920;
+}
+
+.github-stat-popup-title {
+  flex: 1;
+  color: var(--accent-primary);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.github-stat-popup-repo {
+  color: #6b7a8e;
+  font-size: 0.7rem;
+}
+
+.github-stat-popup-date {
+  color: #6b7a8e;
+  font-size: 0.68rem;
+}
+
+.github-stat-popup-stars {
+  color: var(--accent-primary);
+  font-size: 0.7rem;
+}
+
+.github-stat-popup-link {
+  color: var(--accent-primary);
+  font-size: 0.7rem;
+  text-decoration: none;
+  border: 1px solid var(--accent-primary);
+  padding: 0.15rem 0.4rem;
+  border-radius: 3px;
+}
+
+.github-stat-popup-link:hover {
+  background: rgba(250, 163, 44, 0.1);
 }

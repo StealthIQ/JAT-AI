@@ -432,7 +432,7 @@ export const DeckPrimaryView = ({
           <div className="deck-empty-left">
             <div className="deck-empty-octopus">
               <OctopusGlyph
-                color="#d4a017"
+                color="#7c3aed"
                 animation="walk"
                 expression="happy"
                 accessory="none"

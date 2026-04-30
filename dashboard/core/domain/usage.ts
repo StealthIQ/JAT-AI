@@ -41,6 +41,8 @@ export type GitHubRecentCommit = {
   authorEmail: string;
   authoredAt: string;
   body: string;
+  url: string;
+  repo: string;
   filesChanged: number;
   insertions: number;
   deletions: number;

@@ -207,6 +207,7 @@ export const RuntimeStatusStrip = ({
           animation="sway"
           expression="normal"
           scale={2}
+          color="#7c3aed"
         />
         <span className="console-status-brand">JAT-AI</span>
       </div>

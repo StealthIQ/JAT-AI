@@ -117,7 +117,7 @@
 }
 
 .prompts-toggle-btn--yellow:hover {
-  background: rgba(250, 163, 44, 0.12);
+  background: rgba(0, 229, 255, 0.12);
   color: var(--accent-primary);
 }
 
@@ -178,7 +178,7 @@
 }
 
 .prompts-edit-area:focus {
-  outline: 1px solid color-mix(in srgb, var(--accent-primary) 70%, #e9c56c);
+  outline: 1px solid color-mix(in srgb, var(--accent-primary) 70%, #67e8f9);
   outline-offset: 1px;
 }
 
@@ -358,7 +358,7 @@
 }
 
 .sidebar-prompts-item:focus-visible {
-  outline: 1px solid color-mix(in srgb, var(--accent-primary) 70%, #e9c56c);
+  outline: 1px solid color-mix(in srgb, var(--accent-primary) 70%, #67e8f9);
   outline-offset: 1px;
 }
 
@@ -564,7 +564,7 @@
 }
 
 .prompts-create-input:focus {
-  outline: 1px solid color-mix(in srgb, var(--accent-primary) 70%, #e9c56c);
+  outline: 1px solid color-mix(in srgb, var(--accent-primary) 70%, #67e8f9);
   outline-offset: 1px;
 }
 
@@ -582,7 +582,7 @@
 }
 
 .prompts-create-textarea:focus {
-  outline: 1px solid color-mix(in srgb, var(--accent-primary) 70%, #e9c56c);
+  outline: 1px solid color-mix(in srgb, var(--accent-primary) 70%, #67e8f9);
   outline-offset: 1px;
 }
 

@@ -39,11 +39,6 @@ export const buildGitHubCommitSeries = (summary: GitHubRepoSummarySnapshot | nul
     .sort((left, right) => left.date.localeCompare(right.date))
     .slice(-GITHUB_COMMIT_SERIES_LENGTH);
 
-  const firstCommitIndex = sorted.findIndex((point) => point.count > 0);
-  if (firstCommitIndex > 0) {
-    return sorted.slice(firstCommitIndex);
-  }
-
   return sorted;
 };
 
@@ -56,10 +51,14 @@ export const buildGitHubCommitSparkPoints = (
   const minValue = Math.min(...values);
   const maxValue = Math.max(...values);
   const valueRange = Math.max(1, maxValue - minValue);
+  const padY = 12;
+  const padLeft = 40;
+  const padRight = 10;
+  const usableWidth = width - padLeft - padRight;
 
   return series.map((point, index) => {
-    const x = (index / Math.max(1, series.length - 1)) * width;
-    const y = height - ((point.count - minValue) / valueRange) * height;
+    const x = padLeft + (index / Math.max(1, series.length - 1)) * usableWidth;
+    const y = padY + (height - 2 * padY) - ((point.count - minValue) / valueRange) * (height - 2 * padY);
     return {
       date: point.date,
       count: point.count,

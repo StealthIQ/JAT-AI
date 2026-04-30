@@ -201,7 +201,7 @@
   inset: 0 auto 0 0;
   background: repeating-linear-gradient(
       90deg,
-      color-mix(in srgb, var(--accent-primary) 52%, #e1b56a) 0 13px,
+      color-mix(in srgb, var(--accent-primary) 52%, #67e8f9) 0 13px,
       color-mix(in srgb, var(--accent-primary) 22%, #1c2632) 13px 15px
     ),
     linear-gradient(
@@ -213,7 +213,7 @@
 }
 
 .active-agents-codex-usage-percent {
-  color: color-mix(in srgb, var(--accent-primary) 62%, #f0dcb2 38%);
+  color: color-mix(in srgb, var(--accent-primary) 62%, #b3f5ff 38%);
   letter-spacing: 0.05em;
   font-size: 0.68rem;
   font-variant-numeric: tabular-nums;
@@ -404,7 +404,7 @@
 
 .active-agents-agent-row--root {
   background: color-mix(in srgb, var(--sidebar-row) 78%, #243446 22%);
-  border-left: 3px solid color-mix(in srgb, var(--accent-primary) 44%, #90b6e4 56%);
+  border-left: 3px solid color-mix(in srgb, var(--accent-primary) 44%, #67e8f9 56%);
   font-weight: 600;
   padding-left: 0.42rem;
 }
