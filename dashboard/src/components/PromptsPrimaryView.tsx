@@ -296,7 +296,7 @@ export const PromptsPrimaryView = ({ enabled, onSidebarContent }: PromptsPrimary
                   ) : (
                     <>
                       <ActionButton onClick={() => {
-                        if (showXml) onSetEditDraft(textToXml(selectedPrompt.name, selectedPrompt.content, promptCategory));
+                        setShowXml(false);
                         onStartEditing();
                       }}>Edit</ActionButton>
                       <ActionButton onClick={() => setConfirmDelete(true)}>Delete</ActionButton>
