@@ -81,8 +81,6 @@ async def update_prompt(name: str, body: PromptUpdate):
     rows = await db.select("prompts", filters={"name": name})
     if not rows:
         raise HTTPException(404, f"Prompt '{name}' not found")
-    if rows[0]["source"] == "builtin":
-        raise HTTPException(403, "Cannot edit built-in prompts")
     updated = await db.update("prompts", {"content": body.content}, {"name": name})
     return updated[0] if updated else {"ok": True}
 
@@ -92,8 +90,6 @@ async def delete_prompt(name: str):
     rows = await db.select("prompts", filters={"name": name})
     if not rows:
         raise HTTPException(404, f"Prompt '{name}' not found")
-    if rows[0]["source"] == "builtin":
-        raise HTTPException(403, "Cannot delete built-in prompts")
     await db.delete("prompts", {"name": name})
     return {"ok": True}
 
@@ -135,15 +131,16 @@ async def list_tentacles():
             repos[key] = {
                 "tentacleId": key,
                 "displayName": key,
-                "description": "",
+                "name": r["repo_name"],
+                "description": key,
                 "status": "idle",
-                "color": "#d6a21a",
+                "color": "#7c3aed",
                 "octopus": {"animation": "idle", "expression": "normal", "accessory": "none", "hairColor": None},
                 "scope": {"paths": [key], "tags": []},
                 "vaultFiles": [],
                 "todoTotal": 0,
                 "todoDone": 0,
-                "todoItems": [],
+                "todos": [],
                 "suggestedSkills": [],
             }
         repo = repos[key]
@@ -152,10 +149,12 @@ async def list_tentacles():
             repo["todoDone"] += 1
         if r["status"] == "running":
             repo["status"] = "active"
-        repo["todoItems"].append({
-            "text": r.get("prompt", "")[:60],
-            "done": r["status"] in ("completed",),
+        repo["todos"].append({
+            "text": r.get("prompt", "")[:80],
+            "done": r["status"] == "completed",
         })
+    if not repos:
+        repos = await _fetch_jules_repos_as_tentacles()
     return list(repos.values())
 
 
@@ -236,6 +235,47 @@ async def get_setup():
 @app.get("/api/codex/usage")
 async def get_codex_usage():
     return {"status": "unavailable", "source": "none"}
+
+
+async def _fetch_jules_repos_as_tentacles() -> dict[str, dict]:
+    jules_key = settings.jules_api_key
+    if not jules_key:
+        return {}
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            res = await client.get(
+                "https://jules.googleapis.com/v1alpha/sources",
+                headers={"X-Goog-Api-Key": jules_key},
+            )
+        if res.status_code != 200:
+            return {}
+        sources = res.json().get("sources", [])
+        repos: dict[str, dict] = {}
+        for s in sources:
+            gh = s.get("gitHubRepo", {})
+            name = gh.get("repoName", "")
+            owner = gh.get("repoOwner", "")
+            if not name or not owner:
+                continue
+            key = f"{owner}/{name}"
+            repos[key] = {
+                "tentacleId": key,
+                "displayName": key,
+                "name": name,
+                "description": key,
+                "status": "idle",
+                "color": "#7c3aed",
+                "octopus": {"animation": "sway", "expression": "normal", "accessory": "none", "hairColor": None},
+                "scope": {"paths": [key], "tags": []},
+                "vaultFiles": [],
+                "todoTotal": 0,
+                "todoDone": 0,
+                "todos": [],
+                "suggestedSkills": [],
+            }
+        return repos
+    except (httpx.ReadTimeout, httpx.ConnectTimeout):
+        return {}
 
 
 async def _fetch_jules_sessions(headers: dict) -> tuple[dict[str, list[dict]], set[str], set[str]]:

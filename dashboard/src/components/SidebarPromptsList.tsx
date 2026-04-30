@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 import type { PromptLibraryEntry } from "../app/types";
 
@@ -25,8 +25,14 @@ export const SidebarPromptsList = ({
   onRestoreTerminal,
   onCloseTerminal,
 }: SidebarPromptsListProps) => {
-  const userPrompts = useMemo(() => prompts.filter((p) => p.source === "user"), [prompts]);
-  const builtinPrompts = useMemo(() => prompts.filter((p) => p.source === "builtin"), [prompts]);
+  const [search, setSearch] = useState("");
+  const filtered = useMemo(() => {
+    if (!search.trim()) return prompts;
+    const q = search.toLowerCase();
+    return prompts.filter((p) => p.name.toLowerCase().includes(q));
+  }, [prompts, search]);
+  const userPrompts = useMemo(() => filtered.filter((p) => p.source === "user"), [filtered]);
+  const builtinPrompts = useMemo(() => filtered.filter((p) => p.source === "builtin"), [filtered]);
 
   return (
     <div className="sidebar-prompts">
@@ -41,14 +47,22 @@ export const SidebarPromptsList = ({
           disabled={isLoadingPrompts}
           aria-label="Refresh prompts"
         >
-          ↻
+          R
         </button>
       </div>
 
+      <input
+        className="sidebar-prompts-search"
+        type="text"
+        placeholder="Search prompts..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+      />
+
       {isLoadingPrompts && prompts.length === 0 ? (
         <p className="sidebar-prompts-empty">Loading...</p>
-      ) : prompts.length === 0 ? (
-        <p className="sidebar-prompts-empty">No prompts yet</p>
+      ) : filtered.length === 0 ? (
+        <p className="sidebar-prompts-empty">{search ? "No matches" : "No prompts yet"}</p>
       ) : (
         <div className="sidebar-prompts-list">
           {userPrompts.length > 0 && (

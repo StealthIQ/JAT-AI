@@ -263,6 +263,23 @@
   border-bottom: 1px solid #2b2f36;
 }
 
+.sidebar-prompts-search {
+  display: block;
+  width: calc(100% - 0.72rem);
+  margin: 0.36rem;
+  padding: 0.3rem 0.5rem;
+  background: #0b0d10;
+  border: 1px solid #2b2f36;
+  color: #e6e8ec;
+  font-family: var(--font-main);
+  font-size: 0.72rem;
+  outline: none;
+}
+
+.sidebar-prompts-search:focus {
+  border-color: var(--accent-primary);
+}
+
 .sidebar-prompts-new-btn {
   flex: 1;
   background: color-mix(in srgb, var(--accent-primary) 14%, #11161d);

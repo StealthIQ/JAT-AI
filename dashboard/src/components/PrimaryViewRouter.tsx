@@ -8,6 +8,7 @@ import { CanvasPrimaryView } from "./CanvasPrimaryView";
 import { ConversationsPrimaryView } from "./ConversationsPrimaryView";
 import { MonitorPrimaryView } from "./MonitorPrimaryView";
 import { PromptsPrimaryView } from "./PromptsPrimaryView";
+import { ReposPrimaryView } from "./ReposPrimaryView";
 import { SettingsPrimaryView } from "./SettingsPrimaryView";
 
 type PrimaryViewRouterProps = {
@@ -46,6 +47,10 @@ export const PrimaryViewRouter = ({
   promptsEnabled,
   onPromptsSidebarContent,
 }: PrimaryViewRouterProps) => {
+  if (activePrimaryNav === 2) {
+    return <ReposPrimaryView />;
+  }
+
   if (activePrimaryNav === 3) {
     return <ActivityPrimaryView {...activityPrimaryViewProps} />;
   }

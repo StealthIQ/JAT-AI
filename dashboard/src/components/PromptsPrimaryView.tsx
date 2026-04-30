@@ -38,6 +38,8 @@ export const PromptsPrimaryView = ({ enabled, onSidebarContent }: PromptsPrimary
   const [newContent, setNewContent] = useState("");
   const [newXmlContent, setNewXmlContent] = useState("");
   const [newSaving, setNewSaving] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmInput, setConfirmInput] = useState("");
 
   const onDelete = useCallback(() => {
     if (selectedPromptName) return deletePromptLibraryItem(selectedPromptName);
@@ -217,6 +219,41 @@ export const PromptsPrimaryView = ({ enabled, onSidebarContent }: PromptsPrimary
         </div>
       )}
 
+      {confirmDelete && (
+        <div className="prompts-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) { setConfirmDelete(false); setConfirmInput(""); } }}>
+          <div className="prompts-template-popup" style={{ maxWidth: 360 }}>
+            <header className="prompts-template-popup-header">
+              <h3>Delete Prompt</h3>
+              <button type="button" className="prompts-popup-close" onClick={() => { setConfirmDelete(false); setConfirmInput(""); }}>X</button>
+            </header>
+            <div className="prompts-template-popup-body" style={{ padding: "1rem" }}>
+              <p style={{ color: "#a9b0ba", fontSize: "0.78rem", margin: "0 0 0.8rem" }}>
+                Type <strong style={{ color: "#ff6b6b" }}>confirm</strong> to delete "{selectedPromptName}"
+              </p>
+              <input
+                className="prompts-create-input"
+                value={confirmInput}
+                onChange={(e) => setConfirmInput(e.target.value)}
+                placeholder="confirm"
+                autoFocus
+              />
+              <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.8rem", justifyContent: "flex-end" }}>
+                <button type="button" className="prompts-create-cancel" onClick={() => { setConfirmDelete(false); setConfirmInput(""); }}>Cancel</button>
+                <button
+                  type="button"
+                  className="prompts-create-save"
+                  style={{ background: "#7c3aed" }}
+                  disabled={confirmInput !== "confirm"}
+                  onClick={() => { void onDelete(); setConfirmDelete(false); setConfirmInput(""); }}
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {!newPromptMode && !showTemplatePopup && (
         <>
           {errorMessage ? <p className="prompts-error">{errorMessage}</p> : null}
@@ -250,24 +287,22 @@ export const PromptsPrimaryView = ({ enabled, onSidebarContent }: PromptsPrimary
                     Copy
                   </button>
                 </div>
-                {selectedPrompt.source === "user" && (
-                  <div className="prompts-detail-header-actions">
-                    {isEditing ? (
-                      <>
-                        <ActionButton onClick={() => { void onSubmitEdit(); }}>Save</ActionButton>
-                        <ActionButton onClick={onCancelEditing}>Cancel</ActionButton>
-                      </>
-                    ) : (
-                      <>
-                        <ActionButton onClick={() => {
-                          if (showXml) onSetEditDraft(textToXml(selectedPrompt.name, selectedPrompt.content, promptCategory));
-                          onStartEditing();
-                        }}>Edit</ActionButton>
-                        <ActionButton onClick={() => { void onDelete(); }}>Delete</ActionButton>
-                      </>
-                    )}
-                  </div>
-                )}
+                <div className="prompts-detail-header-actions">
+                  {isEditing ? (
+                    <>
+                      <ActionButton onClick={() => { void onSubmitEdit(); }}>Save</ActionButton>
+                      <ActionButton onClick={onCancelEditing}>Cancel</ActionButton>
+                    </>
+                  ) : (
+                    <>
+                      <ActionButton onClick={() => {
+                        if (showXml) onSetEditDraft(textToXml(selectedPrompt.name, selectedPrompt.content, promptCategory));
+                        onStartEditing();
+                      }}>Edit</ActionButton>
+                      <ActionButton onClick={() => setConfirmDelete(true)}>Delete</ActionButton>
+                    </>
+                  )}
+                </div>
               </header>
               {isEditing ? (
                 <textarea
