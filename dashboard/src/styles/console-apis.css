@@ -432,6 +432,36 @@
   color: #e6edf3;
 }
 
+.apis-test-model-list {
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1px solid #2b2f36;
+  border-radius: 4px;
+  background: #141920;
+}
+
+.apis-test-model-item {
+  display: block;
+  width: 100%;
+  padding: 0.35rem 0.6rem;
+  border: none;
+  background: transparent;
+  color: #e6edf3;
+  font-family: var(--font-main);
+  font-size: 0.75rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.apis-test-model-item:hover {
+  background: #1c2430;
+}
+
+.apis-test-model-item.is-active {
+  background: var(--accent-primary);
+  color: #111216;
+}
+
 .apis-test-limits {
   display: flex;
   flex-direction: column;

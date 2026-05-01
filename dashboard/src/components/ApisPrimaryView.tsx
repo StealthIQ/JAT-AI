@@ -362,9 +362,18 @@ export const ApisPrimaryView = () => {
             <div className="apis-popup-body">
               <div className="apis-test-section">
                 <span className="apis-test-label">Available Models ({testModels.length})</span>
-                <select className="apis-test-select" value={testSelectedModel} onChange={(e) => setTestSelectedModel(e.target.value)}>
-                  {testModels.map((m: any) => <option key={m.id} value={m.id}>{m.name || m.id}</option>)}
-                </select>
+                <div className="apis-test-model-list">
+                  {testModels.map((m: any) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      className={`apis-test-model-item${testSelectedModel === m.id ? " is-active" : ""}`}
+                      onClick={() => setTestSelectedModel(m.id)}
+                    >
+                      {m.name || m.id}
+                    </button>
+                  ))}
+                </div>
               </div>
               {testLimits && Object.keys(testLimits).length > 0 && (
                 <div className="apis-test-section">
