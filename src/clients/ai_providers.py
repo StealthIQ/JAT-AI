@@ -249,15 +249,13 @@ class AIProviderPool:
     async def _fetch_models(self, account: ProviderAccount) -> list[dict]:
         if account.provider_type == ProviderType.OLLAMA:
             return await self._list_ollama_models(account)
-        if account.provider_type == ProviderType.GROQ:
-            return await self._list_openai_models(account)
         if account.provider_type == ProviderType.OPENROUTER:
             return await self._list_openrouter_models(account)
         if account.provider_type == ProviderType.GOOGLE:
             return await self._list_google_models(account)
         if account.provider_type == ProviderType.CLOUDFLARE:
             return await self._list_cloudflare_models(account)
-        return []
+        return await self._list_openai_models(account)
 
     async def _list_ollama_models(self, account: ProviderAccount) -> list[dict]:
         resp = await self._client.get(f"{account.base_url}/api/tags")

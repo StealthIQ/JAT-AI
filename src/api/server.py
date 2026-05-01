@@ -123,7 +123,10 @@ async def list_terminal_snapshots():
 
 @app.get("/api/deck/tentacles")
 async def list_tentacles():
-    rows = await db.select("agent_tasks")
+    try:
+        rows = await db.select("agent_tasks")
+    except Exception:
+        rows = []
     repos: dict[str, dict] = {}
     for r in rows:
         key = f"{r['repo_owner']}/{r['repo_name']}"
