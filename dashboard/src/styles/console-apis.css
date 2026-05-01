@@ -440,6 +440,23 @@
   background: #141920;
 }
 
+.apis-test-model-search {
+  width: 100%;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid #2b2f36;
+  border-radius: 4px;
+  background: #0b0d10;
+  color: #e6edf3;
+  font-family: var(--font-main);
+  font-size: 0.75rem;
+  outline: none;
+  margin-bottom: 0.3rem;
+}
+
+.apis-test-model-search:focus {
+  border-color: var(--accent-primary);
+}
+
 .apis-test-model-item {
   display: block;
   width: 100%;

@@ -82,6 +82,7 @@ export const ApisPrimaryView = () => {
   const [testModels, setTestModels] = useState<any[]>([]);
   const [testLimits, setTestLimits] = useState<any>({});
   const [testSelectedModel, setTestSelectedModel] = useState("");
+  const [testModelSearch, setTestModelSearch] = useState("");
   const [testMessage, setTestMessage] = useState("");
   const [testResponse, setTestResponse] = useState("");
   const [testLoading, setTestLoading] = useState(false);
@@ -362,8 +363,17 @@ export const ApisPrimaryView = () => {
             <div className="apis-popup-body">
               <div className="apis-test-section">
                 <span className="apis-test-label">Available Models ({testModels.length})</span>
+                <input
+                  className="apis-test-model-search"
+                  type="text"
+                  placeholder="Search models..."
+                  value={testModelSearch}
+                  onChange={(e) => setTestModelSearch(e.target.value)}
+                />
                 <div className="apis-test-model-list">
-                  {testModels.map((m: any) => (
+                  {testModels
+                    .filter((m: any) => !testModelSearch || (m.name || m.id).toLowerCase().includes(testModelSearch.toLowerCase()))
+                    .map((m: any) => (
                     <button
                       key={m.id}
                       type="button"
