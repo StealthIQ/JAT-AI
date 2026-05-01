@@ -125,6 +125,27 @@ PROVIDER_LIMITS = {
 }
 
 
+DEFAULT_BASE_URLS = {
+    ProviderType.GROQ: "https://api.groq.com/openai/v1",
+    ProviderType.GOOGLE: "https://generativelanguage.googleapis.com/v1beta",
+    ProviderType.CLOUDFLARE: "https://api.cloudflare.com/client/v4/accounts",
+    ProviderType.OPENROUTER: "https://openrouter.ai/api/v1",
+    ProviderType.OLLAMA: "http://localhost:11434",
+    ProviderType.CEREBRAS: "https://api.cerebras.ai/v1",
+    ProviderType.COHERE: "https://api.cohere.com/v2",
+    ProviderType.MISTRAL: "https://api.mistral.ai/v1",
+    ProviderType.NVIDIA_NIM: "https://integrate.api.nvidia.com/v1",
+    ProviderType.GITHUB_MODELS: "https://models.inference.ai.azure.com",
+    ProviderType.HUGGINGFACE: "https://api-inference.huggingface.co/v1",
+    ProviderType.SAMBANOVA: "https://api.sambanova.ai/v1",
+    ProviderType.FIREWORKS: "https://api.fireworks.ai/inference/v1",
+    ProviderType.NEBIUS: "https://api.studio.nebius.ai/v1",
+    ProviderType.HYPERBOLIC: "https://api.hyperbolic.xyz/v1",
+    ProviderType.SCALEWAY: "https://api.scaleway.ai/v1",
+    ProviderType.LONGCAT: "https://api.longcat.chat/openai/v1",
+}
+
+
 class ProviderAccount:
     def __init__(
         self,
@@ -194,26 +215,7 @@ class ProviderAccount:
             self.last_reset = now
 
     def _default_base_url(self) -> str:
-        defaults = {
-            ProviderType.GROQ: "https://api.groq.com/openai/v1",
-            ProviderType.GOOGLE: "https://generativelanguage.googleapis.com/v1beta",
-            ProviderType.CLOUDFLARE: "https://api.cloudflare.com/client/v4/accounts",
-            ProviderType.OPENROUTER: "https://openrouter.ai/api/v1",
-            ProviderType.OLLAMA: "http://localhost:11434",
-            ProviderType.CEREBRAS: "https://api.cerebras.ai/v1",
-            ProviderType.COHERE: "https://api.cohere.com/v2",
-            ProviderType.MISTRAL: "https://api.mistral.ai/v1",
-            ProviderType.NVIDIA_NIM: "https://integrate.api.nvidia.com/v1",
-            ProviderType.GITHUB_MODELS: "https://models.inference.ai.azure.com",
-            ProviderType.HUGGINGFACE: "https://api-inference.huggingface.co/v1",
-            ProviderType.SAMBANOVA: "https://api.sambanova.ai/v1",
-            ProviderType.FIREWORKS: "https://api.fireworks.ai/inference/v1",
-            ProviderType.NEBIUS: "https://api.studio.nebius.ai/v1",
-            ProviderType.HYPERBOLIC: "https://api.hyperbolic.xyz/v1",
-            ProviderType.SCALEWAY: "https://api.scaleway.ai/v1",
-            ProviderType.LONGCAT: "https://api.longcat.chat/openai/v1",
-        }
-        return defaults.get(self.provider_type, "")
+        return DEFAULT_BASE_URLS.get(self.provider_type, "")
 
 
 class AIProviderPool:

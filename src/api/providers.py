@@ -123,18 +123,21 @@ async def get_provider_models(provider_id: str):
 
     try:
         from core.ai_interface import KeyVault
-        from clients.ai_providers import AIProviderPool, ProviderAccount, ProviderType, PROVIDER_LIMITS
+        from clients.ai_providers import AIProviderPool, ProviderAccount, ProviderType, PROVIDER_LIMITS, DEFAULT_BASE_URLS
 
         vault = KeyVault(settings.encryption_key)
         api_key = vault.decrypt(row["api_key_encrypted"]) if row["api_key_encrypted"] else ""
 
+        provider_type = ProviderType(row["provider_type"])
+        base_url = row["base_url"] or DEFAULT_BASE_URLS.get(provider_type, "")
+
         pool = AIProviderPool()
         account = ProviderAccount(
-            provider_type=ProviderType(row["provider_type"]),
+            provider_type=provider_type,
             name=row["name"],
             api_key=api_key,
             model=row["model"],
-            base_url=row["base_url"] or "",
+            base_url=base_url,
         )
         pool.add_account(account)
 
