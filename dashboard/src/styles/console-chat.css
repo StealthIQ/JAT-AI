@@ -106,14 +106,55 @@
 
 .chat-usage-stats {
   display: flex;
-  gap: 0.8rem;
+  align-items: center;
+  gap: 1rem;
   margin-left: auto;
-  font-size: 0.68rem;
+}
+
+.chat-usage-bar-group {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.chat-usage-label {
+  font-size: 0.62rem;
+  color: #5a6a7e;
+  min-width: 38px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.chat-usage-bar {
+  width: 60px;
+  height: 6px;
+  background: #1c2430;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.chat-usage-bar-fill {
+  height: 100%;
+  background: #25d366;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.chat-usage-value {
+  font-size: 0.62rem;
+  color: #6b7a90;
   font-variant-numeric: tabular-nums;
+  min-width: 50px;
+}
+
+.chat-usage-reset {
+  font-size: 0.62rem;
+  color: #5a6a7e;
 }
 
 .chat-usage-item {
   color: #6b7a90;
+  font-size: 0.68rem;
 }
 
 .chat-header-model {

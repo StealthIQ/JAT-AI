@@ -119,16 +119,32 @@ export const ChatPrimaryView = () => {
         {activeConv ? (
           <>
             <header className="chat-header">
-              <select className="chat-provider-select" value={selectedProviderId} onChange={(e) => setSelectedProviderId(e.target.value)}>
+              <select className="chat-provider-select" value={selectedProviderId} onChange={(e) => { setSelectedProviderId(e.target.value); }}>
+                {providers.length === 0 && <option value="">No providers</option>}
                 {providers.map((p) => <option key={p.id} value={p.id}>{p.provider_type} — {p.name}</option>)}
               </select>
-              <select className="chat-model-select" value={selectedModel} onChange={(e) => setSelectedModel(e.target.value)} disabled={modelsLoading}>
+              <select className="chat-model-select" value={selectedModel} onChange={(e) => {
+                setSelectedModel(e.target.value);
+                setConversations((prev) => prev.map((c) => c.id === activeConvId ? { ...c, model: e.target.value, providerId: selectedProviderId } : c));
+              }} disabled={modelsLoading}>
                 {modelsLoading ? <option>Loading...</option> : models.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
               </select>
               <div className="chat-usage-stats">
-                <span className="chat-usage-item">Tokens: {usage.tokensUsed.toLocaleString()}{usage.tokensLimit > 0 ? `/${usage.tokensLimit.toLocaleString()}` : ""}</span>
-                <span className="chat-usage-item">RPM: {usage.requestsToday}/{usage.rpmLimit}</span>
-                <span className="chat-usage-item">Reset: {usage.resetIn}</span>
+                <div className="chat-usage-bar-group">
+                  <span className="chat-usage-label">Tokens</span>
+                  <div className="chat-usage-bar">
+                    <div className="chat-usage-bar-fill" style={{ width: `${usage.tokensLimit > 0 ? Math.min(100, (usage.tokensUsed / usage.tokensLimit) * 100) : 0}%` }} />
+                  </div>
+                  <span className="chat-usage-value">{usage.tokensUsed.toLocaleString()}{usage.tokensLimit > 0 ? `/${usage.tokensLimit.toLocaleString()}` : ""}</span>
+                </div>
+                <div className="chat-usage-bar-group">
+                  <span className="chat-usage-label">RPM</span>
+                  <div className="chat-usage-bar">
+                    <div className="chat-usage-bar-fill" style={{ width: `${Math.min(100, (usage.requestsToday / usage.rpmLimit) * 100)}%` }} />
+                  </div>
+                  <span className="chat-usage-value">{usage.requestsToday}/{usage.rpmLimit}</span>
+                </div>
+                <span className="chat-usage-reset">Reset: {usage.resetIn}</span>
               </div>
             </header>
             <div className="chat-messages">
