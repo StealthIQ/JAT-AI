@@ -113,7 +113,10 @@ async def get_provider_docs(provider_id: str):
 
 @router.get("/{provider_id}/models")
 async def get_provider_models(provider_id: str):
-    rows = await db.select("ai_providers", filters={"id": provider_id})
+    try:
+        rows = await db.select("ai_providers", filters={"id": provider_id})
+    except Exception:
+        return {"models": [], "limits": {}, "provider_type": "unknown", "error": "Database timeout"}
     if not rows:
         raise HTTPException(404, "Provider not found")
     row = rows[0]
@@ -131,14 +134,15 @@ async def get_provider_models(provider_id: str):
             name=row["name"],
             api_key=api_key,
             model=row["model"],
-            base_url=row["base_url"],
+            base_url=row["base_url"] or "",
         )
         pool.add_account(account)
 
         try:
             models = await pool.list_models(account.id, force_refresh=True)
-        except Exception:
+        except Exception as model_err:
             models = []
+            print(f"[models] fetch failed for {row['provider_type']}: {model_err}")
 
         limits = PROVIDER_LIMITS.get(ProviderType(row["provider_type"]), {})
         await pool.close()
