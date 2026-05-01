@@ -13,9 +13,11 @@ type Conversation = {
   title: string;
   messages: Message[];
   createdAt: string;
-  provider?: string;
+  providerId?: string;
   model?: string;
 };
+
+type ProviderInfo = { id: string; name: string; provider_type: string; enabled: boolean };
 
 const MOCK_CONVERSATIONS: Conversation[] = [
   {
@@ -26,19 +28,8 @@ const MOCK_CONVERSATIONS: Conversation[] = [
       { id: "m2", role: "assistant", content: "I found 3 potential issues:\n\n1. SQL injection in the query builder\n2. Missing input validation on the `userId` parameter\n3. No rate limiting on the endpoint", timestamp: "2026-05-01T09:00:05Z", model: "LongCat-Flash-Chat" },
     ],
     createdAt: "2026-05-01T09:00:00Z",
-    provider: "longcat",
+    providerId: "longcat-1",
     model: "LongCat-Flash-Chat",
-  },
-  {
-    id: "conv-2",
-    title: "Architecture planning",
-    messages: [
-      { id: "m3", role: "user", content: "Design a microservices architecture for a payment system", timestamp: "2026-04-30T14:00:00Z" },
-      { id: "m4", role: "assistant", content: "Here's a recommended architecture:\n\n- **Payment Gateway Service**: Handles payment processing\n- **Order Service**: Manages order lifecycle\n- **Notification Service**: Sends receipts and alerts\n- **Fraud Detection Service**: Real-time transaction scoring", timestamp: "2026-04-30T14:00:08Z", model: "deepseek-ai/deepseek-v4-pro" },
-    ],
-    createdAt: "2026-04-30T14:00:00Z",
-    provider: "nvidia_nim",
-    model: "deepseek-ai/deepseek-v4-pro",
   },
 ];
 
@@ -49,7 +40,34 @@ export const ChatPrimaryView = () => {
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  const [providers, setProviders] = useState<ProviderInfo[]>([]);
+  const [selectedProviderId, setSelectedProviderId] = useState("");
+  const [models, setModels] = useState<{ id: string; name: string }[]>([]);
+  const [selectedModel, setSelectedModel] = useState("");
+  const [modelsLoading, setModelsLoading] = useState(false);
+  const [usage, setUsage] = useState({ tokensUsed: 0, tokensLimit: 0, rpm: 0, rpmLimit: 40, requestsToday: 0, resetIn: "24h" });
+
   const activeConv = conversations.find((c) => c.id === activeConvId) ?? null;
+
+  useEffect(() => {
+    fetch("/api/providers").then((r) => r.json()).then((d) => {
+      const enabled = (d.providers ?? []).filter((p: ProviderInfo) => p.enabled);
+      setProviders(enabled);
+      if (enabled.length > 0 && !selectedProviderId) setSelectedProviderId(enabled[0].id);
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!selectedProviderId) return;
+    setModelsLoading(true);
+    setModels([]);
+    fetch(`/api/providers/${selectedProviderId}/models`).then((r) => r.json()).then((d) => {
+      setModels(d.models ?? []);
+      if (d.models?.length > 0) setSelectedModel(d.models[0].id);
+      const lim = d.limits ?? {};
+      setUsage((u) => ({ ...u, rpmLimit: lim.rpm ?? 40, tokensLimit: lim.rpd ?? 0 }));
+    }).catch(() => {}).finally(() => setModelsLoading(false));
+  }, [selectedProviderId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -57,40 +75,22 @@ export const ChatPrimaryView = () => {
 
   const handleSend = useCallback(() => {
     if (!input.trim() || !activeConvId) return;
-    const userMsg: Message = {
-      id: `m-${Date.now()}`,
-      role: "user",
-      content: input.trim(),
-      timestamp: new Date().toISOString(),
-    };
-    setConversations((prev) =>
-      prev.map((c) => c.id === activeConvId ? { ...c, messages: [...c.messages, userMsg] } : c)
-    );
+    const userMsg: Message = { id: `m-${Date.now()}`, role: "user", content: input.trim(), timestamp: new Date().toISOString() };
+    setConversations((prev) => prev.map((c) => c.id === activeConvId ? { ...c, messages: [...c.messages, userMsg] } : c));
     setInput("");
     setIsTyping(true);
+    setUsage((u) => ({ ...u, requestsToday: u.requestsToday + 1, tokensUsed: u.tokensUsed + input.length }));
 
     setTimeout(() => {
-      const assistantMsg: Message = {
-        id: `m-${Date.now() + 1}`,
-        role: "assistant",
-        content: "This is a mock response. Wire up the AI provider to get real responses.",
-        timestamp: new Date().toISOString(),
-        model: activeConv?.model ?? "mock",
-      };
-      setConversations((prev) =>
-        prev.map((c) => c.id === activeConvId ? { ...c, messages: [...c.messages, assistantMsg] } : c)
-      );
+      const assistantMsg: Message = { id: `m-${Date.now() + 1}`, role: "assistant", content: "Mock response. Wire provider to get real answers.", timestamp: new Date().toISOString(), model: selectedModel };
+      setConversations((prev) => prev.map((c) => c.id === activeConvId ? { ...c, messages: [...c.messages, assistantMsg] } : c));
       setIsTyping(false);
+      setUsage((u) => ({ ...u, tokensUsed: u.tokensUsed + 50 }));
     }, 1200);
-  }, [input, activeConvId, activeConv?.model]);
+  }, [input, activeConvId, selectedModel]);
 
   const handleNewConversation = useCallback(() => {
-    const newConv: Conversation = {
-      id: `conv-${Date.now()}`,
-      title: "New conversation",
-      messages: [],
-      createdAt: new Date().toISOString(),
-    };
+    const newConv: Conversation = { id: `conv-${Date.now()}`, title: "New conversation", messages: [], createdAt: new Date().toISOString() };
     setConversations((prev) => [newConv, ...prev]);
     setActiveConvId(newConv.id);
   }, []);
@@ -119,8 +119,17 @@ export const ChatPrimaryView = () => {
         {activeConv ? (
           <>
             <header className="chat-header">
-              <h3>{activeConv.title}</h3>
-              <span className="chat-header-model">{activeConv.model ?? "Select a model"}</span>
+              <select className="chat-provider-select" value={selectedProviderId} onChange={(e) => setSelectedProviderId(e.target.value)}>
+                {providers.map((p) => <option key={p.id} value={p.id}>{p.provider_type} — {p.name}</option>)}
+              </select>
+              <select className="chat-model-select" value={selectedModel} onChange={(e) => setSelectedModel(e.target.value)} disabled={modelsLoading}>
+                {modelsLoading ? <option>Loading...</option> : models.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+              </select>
+              <div className="chat-usage-stats">
+                <span className="chat-usage-item">Tokens: {usage.tokensUsed.toLocaleString()}{usage.tokensLimit > 0 ? `/${usage.tokensLimit.toLocaleString()}` : ""}</span>
+                <span className="chat-usage-item">RPM: {usage.requestsToday}/{usage.rpmLimit}</span>
+                <span className="chat-usage-item">Reset: {usage.resetIn}</span>
+              </div>
             </header>
             <div className="chat-messages">
               {activeConv.messages.map((msg) => (

@@ -79,16 +79,41 @@
 
 .chat-header {
   display: flex;
-  align-items: baseline;
-  gap: 0.8rem;
-  padding: 0.6rem 1rem;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 1rem;
   border-bottom: 1px solid #2b2f36;
+  flex-wrap: wrap;
 }
 
-.chat-header h3 {
-  margin: 0;
-  font-size: 0.85rem;
+.chat-provider-select,
+.chat-model-select {
+  padding: 0.3rem 0.5rem;
+  background: #141920;
+  border: 1px solid #2b2f36;
+  border-radius: 4px;
   color: #e6e8ec;
+  font-family: var(--font-main);
+  font-size: 0.72rem;
+  outline: none;
+  max-width: 200px;
+}
+
+.chat-provider-select:focus,
+.chat-model-select:focus {
+  border-color: var(--accent-primary);
+}
+
+.chat-usage-stats {
+  display: flex;
+  gap: 0.8rem;
+  margin-left: auto;
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.chat-usage-item {
+  color: #6b7a90;
 }
 
 .chat-header-model {
