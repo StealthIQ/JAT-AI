@@ -126,7 +126,10 @@ async def get_provider_models(provider_id: str):
         from clients.ai_providers import AIProviderPool, ProviderAccount, ProviderType, PROVIDER_LIMITS, DEFAULT_BASE_URLS
 
         vault = KeyVault(settings.encryption_key)
-        api_key = vault.decrypt(row["api_key_encrypted"]) if row["api_key_encrypted"] else ""
+        try:
+            api_key = vault.decrypt(row["api_key_encrypted"]) if row["api_key_encrypted"] else ""
+        except Exception:
+            api_key = row["api_key_encrypted"] or ""
 
         provider_type = ProviderType(row["provider_type"])
         base_url = DEFAULT_BASE_URLS.get(provider_type, "")
@@ -166,7 +169,10 @@ async def test_provider_chat(provider_id: str, body: TestChatRequest):
     from clients.ai_providers import AIProviderPool, ProviderAccount, ProviderType
 
     vault = KeyVault(settings.encryption_key)
-    api_key = vault.decrypt(row["api_key_encrypted"]) if row["api_key_encrypted"] else ""
+    try:
+        api_key = vault.decrypt(row["api_key_encrypted"]) if row["api_key_encrypted"] else ""
+    except Exception:
+        api_key = row["api_key_encrypted"] or ""
 
     pool = AIProviderPool()
     account = ProviderAccount(
