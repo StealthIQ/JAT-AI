@@ -98,7 +98,10 @@ async def delete_prompt(name: str):
 
 @app.get("/api/terminals")
 async def list_terminals():
-    rows = await db.select("agent_tasks")
+    try:
+        rows = await db.select("agent_tasks")
+    except Exception:
+        return []
     return [{
         "terminalId": r["id"],
         "label": r.get("prompt", "")[:40],
