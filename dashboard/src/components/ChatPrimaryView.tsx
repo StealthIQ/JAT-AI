@@ -143,14 +143,14 @@ export const ChatPrimaryView = () => {
                 <div className="chat-usage-bar-group">
                   <span className="chat-usage-label">Tokens</span>
                   <div className="chat-usage-bar">
-                    <div className="chat-usage-bar-fill" style={{ width: `${usage.tokensLimit > 0 ? Math.min(100, (usage.tokensUsed / usage.tokensLimit) * 100) : 0}%` }} />
+                    <div className="chat-usage-bar-fill" style={{ width: `${usage.tokensLimit > 0 ? Math.max(0, 100 - (usage.tokensUsed / usage.tokensLimit) * 100) : 100}%` }} />
                   </div>
                   <span className="chat-usage-value">{usage.tokensUsed.toLocaleString()}{usage.tokensLimit > 0 ? `/${usage.tokensLimit.toLocaleString()}` : ""}</span>
                 </div>
                 <div className="chat-usage-bar-group">
                   <span className="chat-usage-label">RPM</span>
                   <div className="chat-usage-bar">
-                    <div className="chat-usage-bar-fill" style={{ width: `${Math.min(100, (usage.requestsToday / usage.rpmLimit) * 100)}%` }} />
+                    <div className="chat-usage-bar-fill" style={{ width: `${Math.max(0, 100 - (usage.requestsToday / usage.rpmLimit) * 100)}%` }} />
                   </div>
                   <span className="chat-usage-value">{usage.requestsToday}/{usage.rpmLimit}</span>
                 </div>
