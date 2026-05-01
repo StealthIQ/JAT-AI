@@ -150,8 +150,13 @@ async def get_provider_models(provider_id: str):
             models = []
             print(f"[models] fetch failed for {row['provider_type']}: {model_err}")
 
-        limits = PROVIDER_LIMITS.get(ProviderType(row["provider_type"]), {})
+        limits = PROVIDER_LIMITS.get(provider_type, {})
         await pool.close()
+
+        # Fall back to extracting model names from limits if API returned nothing
+        if not models and "models" in limits and isinstance(limits["models"], dict):
+            models = [{"id": name, "name": name} for name in limits["models"]]
+
         return {"models": models, "limits": limits, "provider_type": row["provider_type"]}
     except Exception as exc:
         print(f"[models] endpoint error for {provider_id}: {type(exc).__name__}: {exc}")

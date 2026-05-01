@@ -479,6 +479,14 @@
   color: #111216;
 }
 
+.apis-test-model-loading {
+  padding: 1rem;
+  text-align: center;
+  color: #6b7a90;
+  font-size: 0.75rem;
+  font-style: italic;
+}
+
 .apis-test-limits {
   display: flex;
   flex-direction: column;

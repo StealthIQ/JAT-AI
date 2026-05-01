@@ -86,6 +86,7 @@ export const ApisPrimaryView = () => {
   const [testMessage, setTestMessage] = useState("");
   const [testResponse, setTestResponse] = useState("");
   const [testLoading, setTestLoading] = useState(false);
+  const [testModelsLoading, setTestModelsLoading] = useState(false);
 
   const handleDelete = async (id: string) => {
     await fetch(`/api/providers/${id}`, { method: "DELETE" });
@@ -109,6 +110,7 @@ export const ApisPrimaryView = () => {
     setTestLimits({});
     setTestSelectedModel("");
     setTestResponse("");
+    setTestModelsLoading(true);
     const res = await fetch(`/api/providers/${id}/models`);
     if (res.ok) {
       const data = await res.json();
@@ -116,6 +118,7 @@ export const ApisPrimaryView = () => {
       setTestLimits(data.limits || {});
       if (data.models?.length > 0) setTestSelectedModel(data.models[0].id);
     }
+    setTestModelsLoading(false);
   };
 
   const handleTestChat = async () => {
@@ -371,18 +374,24 @@ export const ApisPrimaryView = () => {
                   onChange={(e) => setTestModelSearch(e.target.value)}
                 />
                 <div className="apis-test-model-list">
-                  {testModels
-                    .filter((m: any) => !testModelSearch || (m.name || m.id).toLowerCase().includes(testModelSearch.toLowerCase()))
-                    .map((m: any) => (
-                    <button
-                      key={m.id}
-                      type="button"
-                      className={`apis-test-model-item${testSelectedModel === m.id ? " is-active" : ""}`}
-                      onClick={() => setTestSelectedModel(m.id)}
-                    >
-                      {m.name || m.id}
-                    </button>
-                  ))}
+                  {testModelsLoading ? (
+                    <div className="apis-test-model-loading">Loading models...</div>
+                  ) : testModels.length === 0 ? (
+                    <div className="apis-test-model-loading">No models found</div>
+                  ) : (
+                    testModels
+                      .filter((m: any) => !testModelSearch || (m.name || m.id).toLowerCase().includes(testModelSearch.toLowerCase()))
+                      .map((m: any) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        className={`apis-test-model-item${testSelectedModel === m.id ? " is-active" : ""}`}
+                        onClick={() => setTestSelectedModel(m.id)}
+                      >
+                        {m.name || m.id}
+                      </button>
+                    ))
+                  )}
                 </div>
               </div>
               {testLimits && Object.keys(testLimits).length > 0 && (
