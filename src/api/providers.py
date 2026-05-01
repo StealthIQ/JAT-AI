@@ -171,7 +171,7 @@ async def test_provider_chat(provider_id: str, body: TestChatRequest):
     row = rows[0]
 
     from core.ai_interface import KeyVault
-    from clients.ai_providers import AIProviderPool, ProviderAccount, ProviderType
+    from clients.ai_providers import AIProviderPool, ProviderAccount, ProviderType, DEFAULT_BASE_URLS
 
     vault = KeyVault(settings.encryption_key)
     try:
@@ -179,13 +179,14 @@ async def test_provider_chat(provider_id: str, body: TestChatRequest):
     except Exception:
         api_key = row["api_key_encrypted"] or ""
 
+    provider_type = ProviderType(row["provider_type"])
     pool = AIProviderPool()
     account = ProviderAccount(
-        provider_type=ProviderType(row["provider_type"]),
+        provider_type=provider_type,
         name=row["name"],
         api_key=api_key,
         model=body.model,
-        base_url=row["base_url"],
+        base_url=DEFAULT_BASE_URLS.get(provider_type, ""),
     )
     pool.add_account(account)
 
