@@ -148,7 +148,8 @@ async def get_provider_models(provider_id: str):
         await pool.close()
         return {"models": models, "limits": limits, "provider_type": row["provider_type"]}
     except Exception as exc:
-        raise HTTPException(500, f"Failed to fetch models: {exc}")
+        print(f"[models] endpoint error for {provider_id}: {type(exc).__name__}: {exc}")
+        return {"models": [], "limits": {}, "provider_type": row.get("provider_type", "unknown"), "error": str(exc)}
 
 
 @router.post("/{provider_id}/test")
