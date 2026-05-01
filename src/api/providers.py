@@ -175,7 +175,11 @@ async def test_provider_chat(provider_id: str, body: TestChatRequest):
 
     vault = KeyVault(settings.encryption_key)
     try:
-        api_key = vault.decrypt(row["api_key_encrypted"]) if row["api_key_encrypted"] else ""
+        stored = row["api_key_encrypted"] or ""
+        # Supabase bytea columns return hex-escaped strings
+        if stored.startswith("\\x"):
+            stored = bytes.fromhex(stored[2:]).decode()
+        api_key = vault.decrypt(stored) if stored else ""
     except Exception:
         api_key = row["api_key_encrypted"] or ""
 
