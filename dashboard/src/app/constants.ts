@@ -11,7 +11,7 @@ export const PRIMARY_NAV_ITEMS = [
   { index: 2, label: "Repos" },
   { index: 3, label: "Activity" },
   { index: 5, label: "Monitor" },
-  { index: 6, label: "Conversations" },
+  { index: 6, label: "Chat" },
   { index: 7, label: "Prompts" },
   { index: 8, label: "Settings" },
   { index: 9, label: "APIs" },

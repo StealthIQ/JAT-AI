@@ -5,6 +5,7 @@ import type { UseMonitorRuntimeResult } from "../app/hooks/useMonitorRuntime";
 import { ActivityPrimaryView } from "./ActivityPrimaryView";
 import { ApisPrimaryView } from "./ApisPrimaryView";
 import { CanvasPrimaryView } from "./CanvasPrimaryView";
+import { ChatPrimaryView } from "./ChatPrimaryView";
 import { ConversationsPrimaryView } from "./ConversationsPrimaryView";
 import { MonitorPrimaryView } from "./MonitorPrimaryView";
 import { PromptsPrimaryView } from "./PromptsPrimaryView";
@@ -70,13 +71,7 @@ export const PrimaryViewRouter = ({
   }
 
   if (activePrimaryNav === 6) {
-    return (
-      <ConversationsPrimaryView
-        enabled={conversationsEnabled}
-        onSidebarContent={onConversationsSidebarContent}
-        onActionPanel={onConversationsActionPanel}
-      />
-    );
+    return <ChatPrimaryView />;
   }
 
   if (activePrimaryNav === 7) {
