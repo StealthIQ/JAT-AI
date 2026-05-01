@@ -255,6 +255,10 @@ class AIProviderPool:
             return await self._list_google_models(account)
         if account.provider_type == ProviderType.CLOUDFLARE:
             return await self._list_cloudflare_models(account)
+        if account.provider_type == ProviderType.COHERE:
+            return await self._list_cohere_models(account)
+        if account.provider_type == ProviderType.HUGGINGFACE:
+            return await self._list_huggingface_models(account)
         return await self._list_openai_models(account)
 
     async def _list_ollama_models(self, account: ProviderAccount) -> list[dict]:
@@ -299,6 +303,24 @@ class AIProviderPool:
         resp.raise_for_status()
         models = resp.json().get("result", [])
         return [{"id": m["name"], "name": m.get("description", m["name"]), "task": m.get("task")} for m in models[:50]]
+
+    async def _list_cohere_models(self, account: ProviderAccount) -> list[dict]:
+        resp = await self._client.get(
+            f"{account.base_url}/models",
+            headers={"Authorization": f"Bearer {account.api_key}"},
+        )
+        resp.raise_for_status()
+        models = resp.json().get("models", [])
+        return [{"id": m["name"], "name": m["name"], "endpoints": m.get("endpoints")} for m in models]
+
+    async def _list_huggingface_models(self, account: ProviderAccount) -> list[dict]:
+        resp = await self._client.get(
+            "https://huggingface.co/api/models?pipeline_tag=text-generation&sort=downloads&limit=30",
+            headers={"Authorization": f"Bearer {account.api_key}"},
+        )
+        resp.raise_for_status()
+        models = resp.json()
+        return [{"id": m["id"], "name": m["id"], "downloads": m.get("downloads")} for m in models]
 
     def get_account(self, account_id: UUID) -> ProviderAccount:
         for a in self._accounts:
