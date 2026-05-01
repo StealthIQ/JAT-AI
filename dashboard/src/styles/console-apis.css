@@ -500,11 +500,19 @@
   gap: 1rem;
   padding: 0.25rem 0;
   border-bottom: 1px solid #1e2228;
+  align-items: baseline;
 }
 
-.apis-test-limit-model {
+.apis-test-limit-key {
+  color: #8b949e;
+  min-width: 120px;
+  font-size: 0.72rem;
+}
+
+.apis-test-limit-val {
   color: var(--accent-primary);
-  min-width: 140px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 .apis-test-chat {

@@ -396,17 +396,17 @@ export const ApisPrimaryView = () => {
               </div>
               {testLimits && Object.keys(testLimits).length > 0 && (
                 <div className="apis-test-section">
-                  <span className="apis-test-label">Limits</span>
+                  <span className="apis-test-label">Limits{testSelectedModel ? ` — ${testSelectedModel}` : ""}</span>
                   <div className="apis-test-limits">
-                    {testLimits.models ? (
-                      Object.entries(testLimits.models as Record<string, any>).map(([model, lim]: [string, any]) => (
-                        <div key={model} className="apis-test-limit-row">
-                          <span className="apis-test-limit-model">{model}</span>
-                          {lim.rpm && <span>{lim.rpm} rpm</span>}
-                          {lim.rpd && <span>{lim.rpd} rpd</span>}
-                          {lim.tpm && <span>{lim.tpm} tpm</span>}
+                    {testLimits.models && testSelectedModel && testLimits.models[testSelectedModel] ? (
+                      Object.entries(testLimits.models[testSelectedModel] as Record<string, any>).map(([key, val]) => (
+                        <div key={key} className="apis-test-limit-row">
+                          <span className="apis-test-limit-key">{key}</span>
+                          <span className="apis-test-limit-val">{typeof val === "number" ? val.toLocaleString() : String(val)}</span>
                         </div>
                       ))
+                    ) : testLimits.models && !testSelectedModel ? (
+                      <div className="apis-test-limit-row"><span>Select a model to see limits</span></div>
                     ) : (
                       <div className="apis-test-limit-row">
                         {testLimits.rpm && <span>{testLimits.rpm} rpm</span>}
