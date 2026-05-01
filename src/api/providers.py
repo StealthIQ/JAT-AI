@@ -129,7 +129,7 @@ async def get_provider_models(provider_id: str):
         api_key = vault.decrypt(row["api_key_encrypted"]) if row["api_key_encrypted"] else ""
 
         provider_type = ProviderType(row["provider_type"])
-        base_url = row["base_url"] or DEFAULT_BASE_URLS.get(provider_type, "")
+        base_url = DEFAULT_BASE_URLS.get(provider_type, "")
 
         pool = AIProviderPool()
         account = ProviderAccount(
