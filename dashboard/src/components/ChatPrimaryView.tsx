@@ -40,8 +40,8 @@ export const ChatPrimaryView = () => {
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const [providers, setProviders] = useState<ProviderInfo[]>([]);
-  const [selectedProviderId, setSelectedProviderId] = useState("");
+  const [providerTypes, setProviderTypes] = useState<{ type: string; keyCount: number; ids: string[] }[]>([]);
+  const [selectedProviderType, setSelectedProviderType] = useState("");
   const [models, setModels] = useState<{ id: string; name: string }[]>([]);
   const [selectedModel, setSelectedModel] = useState("");
   const [modelsLoading, setModelsLoading] = useState(false);
@@ -52,22 +52,32 @@ export const ChatPrimaryView = () => {
   useEffect(() => {
     fetch("/api/providers").then((r) => r.json()).then((d) => {
       const enabled = (d.providers ?? []).filter((p: ProviderInfo) => p.enabled);
-      setProviders(enabled);
-      if (enabled.length > 0 && !selectedProviderId) setSelectedProviderId(enabled[0].id);
+      const grouped: Record<string, { type: string; keyCount: number; ids: string[] }> = {};
+      for (const p of enabled) {
+        if (!grouped[p.provider_type]) grouped[p.provider_type] = { type: p.provider_type, keyCount: 0, ids: [] };
+        grouped[p.provider_type].keyCount++;
+        grouped[p.provider_type].ids.push(p.id);
+      }
+      const types = Object.values(grouped);
+      setProviderTypes(types);
+      if (types.length > 0 && !selectedProviderType) setSelectedProviderType(types[0].type);
     }).catch(() => {});
   }, []);
 
   useEffect(() => {
-    if (!selectedProviderId) return;
+    if (!selectedProviderType) return;
+    const group = providerTypes.find((g) => g.type === selectedProviderType);
+    if (!group || group.ids.length === 0) return;
     setModelsLoading(true);
     setModels([]);
-    fetch(`/api/providers/${selectedProviderId}/models`).then((r) => r.json()).then((d) => {
+    fetch(`/api/providers/${group.ids[0]}/models`).then((r) => r.json()).then((d) => {
       setModels(d.models ?? []);
       if (d.models?.length > 0) setSelectedModel(d.models[0].id);
       const lim = d.limits ?? {};
-      setUsage((u) => ({ ...u, rpmLimit: lim.rpm ?? 40, tokensLimit: lim.rpd ?? 0 }));
+      const keyCount = group.keyCount;
+      setUsage((u) => ({ ...u, rpmLimit: (lim.rpm ?? 40) * keyCount, tokensLimit: (lim.rpd ?? 0) * keyCount }));
     }).catch(() => {}).finally(() => setModelsLoading(false));
-  }, [selectedProviderId]);
+  }, [selectedProviderType, providerTypes]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -119,13 +129,13 @@ export const ChatPrimaryView = () => {
         {activeConv ? (
           <>
             <header className="chat-header">
-              <select className="chat-provider-select" value={selectedProviderId} onChange={(e) => { setSelectedProviderId(e.target.value); }}>
-                {providers.length === 0 && <option value="">No providers</option>}
-                {providers.map((p) => <option key={p.id} value={p.id}>{p.provider_type} — {p.name}</option>)}
+              <select className="chat-provider-select" value={selectedProviderType} onChange={(e) => { setSelectedProviderType(e.target.value); }}>
+                {providerTypes.length === 0 && <option value="">No providers</option>}
+                {providerTypes.map((g) => <option key={g.type} value={g.type}>{g.type.replace("_", " ").toUpperCase()} ({g.keyCount} key{g.keyCount > 1 ? "s" : ""})</option>)}
               </select>
               <select className="chat-model-select" value={selectedModel} onChange={(e) => {
                 setSelectedModel(e.target.value);
-                setConversations((prev) => prev.map((c) => c.id === activeConvId ? { ...c, model: e.target.value, providerId: selectedProviderId } : c));
+                setConversations((prev) => prev.map((c) => c.id === activeConvId ? { ...c, model: e.target.value, providerId: selectedProviderType } : c));
               }} disabled={modelsLoading}>
                 {modelsLoading ? <option>Loading...</option> : models.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
               </select>
