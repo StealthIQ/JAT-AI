@@ -272,7 +272,8 @@ class AIProviderPool:
             f"{account.base_url}/models",
             headers={"Authorization": f"Bearer {account.api_key}"},
         )
-        resp.raise_for_status()
+        if resp.status_code != 200:
+            raise Exception(f"HTTP {resp.status_code}: {resp.text[:200]}")
         models = resp.json().get("data", [])
         return [{"id": m["id"], "name": m["id"], "owned_by": m.get("owned_by")} for m in models]
 
