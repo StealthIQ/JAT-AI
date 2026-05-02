@@ -267,3 +267,106 @@
   color: #5a6a7e;
   font-size: 0.82rem;
 }
+
+.chat-model-dropdown {
+  position: relative;
+}
+
+.chat-model-dropdown-trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.5rem;
+  background: #141920;
+  border: 1px solid #2b2f36;
+  border-radius: 4px;
+  color: #e6e8ec;
+  font-family: var(--font-main);
+  font-size: 0.72rem;
+  cursor: pointer;
+  max-width: 240px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chat-model-dropdown-trigger:hover {
+  border-color: var(--accent-primary);
+}
+
+.chat-model-dropdown-trigger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.chat-model-dropdown-arrow {
+  margin-left: auto;
+  font-size: 0.65rem;
+  color: #5a6a7e;
+}
+
+.chat-model-dropdown-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 100;
+  width: 280px;
+  background: #0f1318;
+  border: 1px solid #2b2f36;
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-model-dropdown-search {
+  padding: 0.45rem 0.6rem;
+  background: #141920;
+  border: none;
+  border-bottom: 1px solid #2b2f36;
+  border-radius: 6px 6px 0 0;
+  color: #e6e8ec;
+  font-family: var(--font-main);
+  font-size: 0.72rem;
+  outline: none;
+}
+
+.chat-model-dropdown-search:focus {
+  background: #1a2030;
+}
+
+.chat-model-dropdown-search::placeholder {
+  color: #5a6a7e;
+}
+
+.chat-model-dropdown-list {
+  max-height: 220px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-model-dropdown-item {
+  padding: 0.55rem 0.6rem;
+  min-height: 32px;
+  background: transparent;
+  border: none;
+  text-align: left;
+  color: #a9b0ba;
+  font-family: var(--font-main);
+  font-size: 0.76rem;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chat-model-dropdown-item:hover {
+  background: #1c2430;
+  color: #e6e8ec;
+}
+
+.chat-model-dropdown-item.is-active {
+  background: color-mix(in srgb, var(--accent-primary) 18%, #11161d);
+  color: var(--accent-primary);
+}

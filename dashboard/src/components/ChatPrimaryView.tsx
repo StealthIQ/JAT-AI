@@ -45,6 +45,9 @@ export const ChatPrimaryView = () => {
   const [models, setModels] = useState<{ id: string; name: string }[]>([]);
   const [selectedModel, setSelectedModel] = useState("");
   const [modelsLoading, setModelsLoading] = useState(false);
+  const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
+  const [modelSearch, setModelSearch] = useState("");
+  const modelDropdownRef = useRef<HTMLDivElement>(null);
   const [usage, setUsage] = useState({ tokensUsed: 0, tokensLimit: 0, rpm: 0, rpmLimit: 40, requestsToday: 0, resetIn: "24h" });
 
   const activeConv = conversations.find((c) => c.id === activeConvId) ?? null;
@@ -78,6 +81,18 @@ export const ChatPrimaryView = () => {
       setUsage((u) => ({ ...u, rpmLimit: (lim.rpm ?? 40) * keyCount, tokensLimit: (lim.rpd ?? 0) * keyCount }));
     }).catch(() => {}).finally(() => setModelsLoading(false));
   }, [selectedProviderType, providerTypes]);
+
+  useEffect(() => {
+    if (!modelDropdownOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (modelDropdownRef.current && !modelDropdownRef.current.contains(e.target as Node)) {
+        setModelDropdownOpen(false);
+        setModelSearch("");
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [modelDropdownOpen]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -133,12 +148,48 @@ export const ChatPrimaryView = () => {
                 {providerTypes.length === 0 && <option value="">No providers</option>}
                 {providerTypes.map((g) => <option key={g.type} value={g.type}>{g.type.replace("_", " ").toUpperCase()} ({g.keyCount} key{g.keyCount > 1 ? "s" : ""})</option>)}
               </select>
-              <select className="chat-model-select" value={selectedModel} onChange={(e) => {
-                setSelectedModel(e.target.value);
-                setConversations((prev) => prev.map((c) => c.id === activeConvId ? { ...c, model: e.target.value, providerId: selectedProviderType } : c));
-              }} disabled={modelsLoading}>
-                {modelsLoading ? <option>Loading...</option> : models.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-              </select>
+              <div className="chat-model-dropdown" ref={modelDropdownRef}>
+                <button
+                  type="button"
+                  className="chat-model-dropdown-trigger"
+                  onClick={() => { if (!modelsLoading) setModelDropdownOpen((o) => !o); }}
+                  disabled={modelsLoading}
+                >
+                  {modelsLoading ? "Loading..." : (models.find((m) => m.id === selectedModel)?.name ?? "Select model")}
+                  <span className="chat-model-dropdown-arrow">▾</span>
+                </button>
+                {modelDropdownOpen && (
+                  <div className="chat-model-dropdown-panel">
+                    <input
+                      className="chat-model-dropdown-search"
+                      type="text"
+                      placeholder="Search models..."
+                      value={modelSearch}
+                      onChange={(e) => setModelSearch(e.target.value)}
+                      autoFocus
+                    />
+                    <div className="chat-model-dropdown-list">
+                      {models
+                        .filter((m) => m.name.toLowerCase().includes(modelSearch.toLowerCase()))
+                        .map((m) => (
+                          <button
+                            key={m.id}
+                            type="button"
+                            className={`chat-model-dropdown-item${m.id === selectedModel ? " is-active" : ""}`}
+                            onClick={() => {
+                              setSelectedModel(m.id);
+                              setConversations((prev) => prev.map((c) => c.id === activeConvId ? { ...c, model: m.id, providerId: selectedProviderType } : c));
+                              setModelDropdownOpen(false);
+                              setModelSearch("");
+                            }}
+                          >
+                            {m.name}
+                          </button>
+                        ))}
+                    </div>
+                  </div>
+                )}
+              </div>
               <div className="chat-usage-stats">
                 <div className="chat-usage-bar-group">
                   <span className="chat-usage-label">Tokens</span>
