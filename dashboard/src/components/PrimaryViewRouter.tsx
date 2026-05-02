@@ -6,8 +6,7 @@ import { ActivityPrimaryView } from "./ActivityPrimaryView";
 import { ApisPrimaryView } from "./ApisPrimaryView";
 import { CanvasPrimaryView } from "./CanvasPrimaryView";
 import { ChatPrimaryView } from "./ChatPrimaryView";
-import { ConversationsPrimaryView } from "./ConversationsPrimaryView";
-import { MonitorPrimaryView } from "./MonitorPrimaryView";
+import { JulesPrimaryView } from "./JulesPrimaryView";
 import { PromptsPrimaryView } from "./PromptsPrimaryView";
 import { ReposPrimaryView } from "./ReposPrimaryView";
 import { SettingsPrimaryView } from "./SettingsPrimaryView";
@@ -57,17 +56,7 @@ export const PrimaryViewRouter = ({
   }
 
   if (activePrimaryNav === 5) {
-    if (isMonitorVisible) {
-      return <MonitorPrimaryView monitorRuntime={monitorRuntime} />;
-    }
-    return (
-      <section className="monitor-view" aria-label="Monitor primary view disabled">
-        <section className="monitor-panel monitor-panel--configure">
-          <h3>Monitor is disabled</h3>
-          <p>Enable Monitor workspace view in Settings to restore this panel.</p>
-        </section>
-      </section>
-    );
+    return <JulesPrimaryView />;
   }
 
   if (activePrimaryNav === 6) {

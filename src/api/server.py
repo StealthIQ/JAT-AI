@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from api.providers import router as providers_router
 from api.github import router as github_router
+from api.jules_accounts import router as jules_router
 from clients.supabase import SupabaseClient
 from config import load_settings
 
@@ -36,6 +37,7 @@ app.add_middleware(
 )
 app.include_router(providers_router)
 app.include_router(github_router)
+app.include_router(jules_router)
 
 
 class PromptCreate(BaseModel):

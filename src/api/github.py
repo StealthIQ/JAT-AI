@@ -177,3 +177,14 @@ async def get_github_stars():
     async with httpx.AsyncClient(timeout=15.0) as client:
         repos = await _fetch_all_repos(client, headers)
         return [{"repo": r["full_name"], "stars": r["stargazers_count"], "url": r["html_url"]} for r in repos if r.get("stargazers_count", 0) > 0]
+
+
+@router.get("/api/github/repos")
+async def get_github_repos():
+    token = settings.github_token
+    if not token:
+        return {"repos": []}
+    headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        repos = await _fetch_all_repos(client, headers)
+        return {"repos": [{"name": r["name"], "full_name": r["full_name"], "private": r.get("private", False)} for r in repos]}

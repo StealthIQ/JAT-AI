@@ -48,6 +48,18 @@ export const ChatPrimaryView = () => {
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
   const [modelSearch, setModelSearch] = useState("");
   const modelDropdownRef = useRef<HTMLDivElement>(null);
+  const [providerDropdownOpen, setProviderDropdownOpen] = useState(false);
+  const [providerSearch, setProviderSearch] = useState("");
+  const providerDropdownRef = useRef<HTMLDivElement>(null);
+  const [repos, setRepos] = useState<string[]>([]);
+  const [selectedRepo, setSelectedRepo] = useState("");
+  const [repoDropdownOpen, setRepoDropdownOpen] = useState(false);
+  const [repoSearch, setRepoSearch] = useState("");
+  const repoDropdownRef = useRef<HTMLDivElement>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageError, setImageError] = useState("");
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const [usage, setUsage] = useState({ tokensUsed: 0, tokensLimit: 0, rpm: 0, rpmLimit: 40, requestsToday: 0, resetIn: "24h" });
 
   const activeConv = conversations.find((c) => c.id === activeConvId) ?? null;
@@ -95,6 +107,38 @@ export const ChatPrimaryView = () => {
   }, [modelDropdownOpen]);
 
   useEffect(() => {
+    if (!providerDropdownOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (providerDropdownRef.current && !providerDropdownRef.current.contains(e.target as Node)) {
+        setProviderDropdownOpen(false);
+        setProviderSearch("");
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [providerDropdownOpen]);
+
+  useEffect(() => {
+    fetch("/api/github/repos").then((r) => r.json()).then((d) => {
+      const names = (d.repos ?? []).map((r: { name: string }) => r.name);
+      setRepos(names);
+      if (names.length > 0) setSelectedRepo(names[0]);
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!repoDropdownOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (repoDropdownRef.current && !repoDropdownRef.current.contains(e.target as Node)) {
+        setRepoDropdownOpen(false);
+        setRepoSearch("");
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [repoDropdownOpen]);
+
+  useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [activeConv?.messages.length]);
 
@@ -113,6 +157,33 @@ export const ChatPrimaryView = () => {
       setUsage((u) => ({ ...u, tokensUsed: u.tokensUsed + 50 }));
     }, 1200);
   }, [input, activeConvId, selectedModel]);
+
+  const VISION_PATTERNS = /vision|gpt-4o|gemini|claude-3|llava|pixtral|qwen-vl|internvl/i;
+
+  const handleImageSelect = useCallback(() => {
+    const supportsVision = VISION_PATTERNS.test(selectedModel);
+    if (!supportsVision) {
+      setImageError("This model does not support image inputs. Select a vision-capable model.");
+      setTimeout(() => setImageError(""), 4000);
+      return;
+    }
+    imageInputRef.current?.click();
+  }, [selectedModel]);
+
+  const handleImageChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImageFile(file);
+    const reader = new FileReader();
+    reader.onload = () => setImagePreview(reader.result as string);
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  }, []);
+
+  const handleRemoveImage = useCallback(() => {
+    setImageFile(null);
+    setImagePreview(null);
+  }, []);
 
   const handleNewConversation = useCallback(() => {
     const newConv: Conversation = { id: `conv-${Date.now()}`, title: "New conversation", messages: [], createdAt: new Date().toISOString() };
@@ -144,10 +215,47 @@ export const ChatPrimaryView = () => {
         {activeConv ? (
           <>
             <header className="chat-header">
-              <select className="chat-provider-select" value={selectedProviderType} onChange={(e) => { setSelectedProviderType(e.target.value); }}>
-                {providerTypes.length === 0 && <option value="">No providers</option>}
-                {providerTypes.map((g) => <option key={g.type} value={g.type}>{g.type.replace("_", " ").toUpperCase()} ({g.keyCount} key{g.keyCount > 1 ? "s" : ""})</option>)}
-              </select>
+              <span className="chat-header-label">Model:</span>
+              <div className="chat-model-dropdown" ref={providerDropdownRef}>
+                <button
+                  type="button"
+                  className="chat-model-dropdown-trigger"
+                  onClick={() => setProviderDropdownOpen((o) => !o)}
+                >
+                  {providerTypes.length === 0 ? "No providers" : `${selectedProviderType.replace("_", " ").toUpperCase()} (${providerTypes.find((g) => g.type === selectedProviderType)?.keyCount ?? 0} key${(providerTypes.find((g) => g.type === selectedProviderType)?.keyCount ?? 0) > 1 ? "s" : ""})`}
+                  <span className="chat-model-dropdown-arrow">▾</span>
+                </button>
+                {providerDropdownOpen && (
+                  <div className="chat-model-dropdown-panel">
+                    <input
+                      className="chat-model-dropdown-search"
+                      type="text"
+                      placeholder="Search providers..."
+                      value={providerSearch}
+                      onChange={(e) => setProviderSearch(e.target.value)}
+                      autoFocus
+                    />
+                    <div className="chat-model-dropdown-list">
+                      {providerTypes
+                        .filter((g) => g.type.toLowerCase().includes(providerSearch.toLowerCase()))
+                        .map((g) => (
+                          <button
+                            key={g.type}
+                            type="button"
+                            className={`chat-model-dropdown-item${g.type === selectedProviderType ? " is-active" : ""}`}
+                            onClick={() => {
+                              setSelectedProviderType(g.type);
+                              setProviderDropdownOpen(false);
+                              setProviderSearch("");
+                            }}
+                          >
+                            {g.type.replace("_", " ").toUpperCase()} ({g.keyCount} key{g.keyCount > 1 ? "s" : ""})
+                          </button>
+                        ))}
+                    </div>
+                  </div>
+                )}
+              </div>
               <div className="chat-model-dropdown" ref={modelDropdownRef}>
                 <button
                   type="button"
@@ -190,6 +298,48 @@ export const ChatPrimaryView = () => {
                   </div>
                 )}
               </div>
+              <div className="chat-header-spacer" />
+              <span className="chat-header-label">Repo:</span>
+              <div className="chat-model-dropdown" ref={repoDropdownRef}>
+                <button
+                  type="button"
+                  className="chat-model-dropdown-trigger"
+                  onClick={() => setRepoDropdownOpen((o) => !o)}
+                >
+                  {selectedRepo || "Select repo"}
+                  <span className="chat-model-dropdown-arrow">▾</span>
+                </button>
+                {repoDropdownOpen && (
+                  <div className="chat-model-dropdown-panel">
+                    <input
+                      className="chat-model-dropdown-search"
+                      type="text"
+                      placeholder="Search repos..."
+                      value={repoSearch}
+                      onChange={(e) => setRepoSearch(e.target.value)}
+                      autoFocus
+                    />
+                    <div className="chat-model-dropdown-list">
+                      {repos
+                        .filter((r) => r.toLowerCase().includes(repoSearch.toLowerCase()))
+                        .map((r) => (
+                          <button
+                            key={r}
+                            type="button"
+                            className={`chat-model-dropdown-item${r === selectedRepo ? " is-active" : ""}`}
+                            onClick={() => {
+                              setSelectedRepo(r);
+                              setRepoDropdownOpen(false);
+                              setRepoSearch("");
+                            }}
+                          >
+                            {r}
+                          </button>
+                        ))}
+                    </div>
+                  </div>
+                )}
+              </div>
               <div className="chat-usage-stats">
                 <div className="chat-usage-bar-group">
                   <span className="chat-usage-label">Tokens</span>
@@ -225,6 +375,26 @@ export const ChatPrimaryView = () => {
             </div>
             <div className="chat-input-bar">
               <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/*"
+                className="chat-image-input-hidden"
+                onChange={handleImageChange}
+              />
+              <button type="button" className="chat-image-btn" onClick={handleImageSelect} title="Attach image">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <polyline points="21 15 16 10 5 21" />
+                </svg>
+              </button>
+              {imagePreview && (
+                <div className="chat-image-preview">
+                  <img src={imagePreview} alt="Attached" />
+                  <button type="button" className="chat-image-remove" onClick={handleRemoveImage}>x</button>
+                </div>
+              )}
+              <input
                 className="chat-input"
                 type="text"
                 placeholder="Type a message..."
@@ -236,6 +406,9 @@ export const ChatPrimaryView = () => {
                 Send
               </button>
             </div>
+            {imageError && (
+              <div className="chat-image-error">{imageError}</div>
+            )}
           </>
         ) : (
           <div className="chat-empty">Select a conversation or start a new one.</div>
