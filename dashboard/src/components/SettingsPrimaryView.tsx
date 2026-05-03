@@ -201,7 +201,114 @@ export const SettingsPrimaryView = (_props: SettingsPrimaryViewProps) => {
           </div>
         </div>
       )}
+
+      <ResetSection />
     </section>
+  );
+};
+
+const RESET_TARGETS = [
+  { id: "ai_providers", label: "AI Provider Keys", desc: "All stored API keys for AI providers" },
+  { id: "jules_accounts", label: "Jules Accounts", desc: "All Jules API keys and account data" },
+  { id: "github_tokens", label: "GitHub Tokens", desc: "Classic and fine-grained GitHub tokens from .env" },
+  { id: "env_keys", label: "All .env Keys", desc: "Wipes all .env values except ENCRYPTION_KEY" },
+  { id: "conversations", label: "Chat Conversations", desc: "All chat history and messages" },
+  { id: "custom_prompts", label: "Custom Prompts", desc: "User-created prompts (keeps built-in skills)" },
+  { id: "system_prompt_overrides", label: "System Prompt Edits", desc: "Restores all system prompts to defaults" },
+  { id: "agent_tasks", label: "Agent Tasks & Activities", desc: "All task history and session activities" },
+  { id: "workflows", label: "Workflows", desc: "All saved workflow definitions" },
+  { id: "context_messages", label: "Context Messages", desc: "Cross-session context data" },
+  { id: "merge_queue", label: "Merge Queue", desc: "Pending merge operations" },
+];
+
+const ResetSection = () => {
+  const [showPopup, setShowPopup] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [confirmInput, setConfirmInput] = useState("");
+  const [resetting, setResetting] = useState(false);
+
+  const toggle = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const handleReset = () => {
+    setResetting(true);
+    fetch("/api/settings/reset", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ targets: [...selected] }),
+    })
+      .then(() => { window.location.reload(); })
+      .catch(() => setResetting(false));
+  };
+
+  const closePopup = () => {
+    setShowPopup(false);
+    setSelected(new Set());
+    setConfirmInput("");
+  };
+
+  return (
+    <>
+      <section className="settings-panel">
+        <header className="settings-panel-header">
+          <h2>Reset</h2>
+          <p>Clear stored data. System prompts and built-in skills are preserved.</p>
+        </header>
+        <div>
+          <button type="button" className="settings-reset-btn" onClick={() => setShowPopup(true)}>
+            Reset Data...
+          </button>
+        </div>
+      </section>
+
+      {showPopup && (
+        <div className="settings-popup-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) closePopup(); }}>
+          <div className="settings-popup settings-popup--wide">
+            <h3 className="settings-popup-title">Reset Data</h3>
+            <p className="settings-popup-warning">
+              Select what you want to clear. Built-in skills and system prompts are never deleted.
+            </p>
+            <label className="settings-reset-select-all">
+              <input type="checkbox" checked={selected.size === RESET_TARGETS.length} onChange={() => {
+                if (selected.size === RESET_TARGETS.length) setSelected(new Set());
+                else setSelected(new Set(RESET_TARGETS.map((t) => t.id)));
+              }} />
+              <span>Select All</span>
+            </label>
+            <div className="settings-reset-list">
+              {RESET_TARGETS.map((t) => (
+                <label key={t.id} className="settings-reset-item">
+                  <input type="checkbox" checked={selected.has(t.id)} onChange={() => toggle(t.id)} />
+                  <div>
+                    <span className="settings-reset-item-label">{t.label}</span>
+                    <span className="settings-reset-item-desc">{t.desc}</span>
+                  </div>
+                </label>
+              ))}
+            </div>
+            {selected.size > 0 && (
+              <>
+                <p className="settings-popup-confirm-text">
+                  Type "yes reset these" to confirm clearing {selected.size} item{selected.size > 1 ? "s" : ""}:
+                </p>
+                <input className="settings-popup-input" type="text" value={confirmInput} onChange={(e) => setConfirmInput(e.target.value)} placeholder="yes reset these" />
+              </>
+            )}
+            <div className="settings-popup-footer">
+              <button type="button" onClick={closePopup}>Cancel</button>
+              <button type="button" className="settings-popup-danger" disabled={selected.size === 0 || confirmInput !== "yes reset these" || resetting} onClick={handleReset}>
+                {resetting ? "Resetting..." : "Confirm Reset"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 

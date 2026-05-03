@@ -65,6 +65,58 @@ async def list_prompts():
     return {"prompts": [{"name": r["name"], "source": r.get("source", "user")} for r in rows]}
 
 
+@app.get("/api/prompts/system")
+async def list_system_prompts():
+    from prompts.system_prompts import (
+        ASK_MODE_SYSTEM, PLAN_MODE_SYSTEM, BUILD_MODE_SYSTEM,
+        AUTO_MODE_SYSTEM, JULES_MASTER_PROMPT, JULES_QUESTION_HANDLER,
+        REVIEW_SESSION_PROMPT,
+    )
+    return {"prompts": [
+        {"name": "ask-mode", "content": ASK_MODE_SYSTEM},
+        {"name": "plan-mode", "content": PLAN_MODE_SYSTEM},
+        {"name": "build-mode", "content": BUILD_MODE_SYSTEM},
+        {"name": "auto-mode", "content": AUTO_MODE_SYSTEM},
+        {"name": "jules-master", "content": JULES_MASTER_PROMPT},
+        {"name": "jules-question-handler", "content": JULES_QUESTION_HANDLER},
+        {"name": "review-session", "content": REVIEW_SESSION_PROMPT},
+    ]}
+
+
+@app.put("/api/prompts/system/{name}")
+async def update_system_prompt(name: str, body: PromptUpdate):
+    rows = await db.select("prompts", filters={"name": name, "source": "system"})
+    if rows:
+        await db.update("prompts", {"content": body.content}, {"name": name})
+    else:
+        await db.insert("prompts", {
+            "name": name, "source": "system", "content": body.content, "format": "xml",
+        })
+    return {"ok": True}
+
+
+@app.post("/api/prompts/system/{name}/reset")
+async def reset_system_prompt(name: str):
+    from prompts.system_prompts import (
+        ASK_MODE_SYSTEM, PLAN_MODE_SYSTEM, BUILD_MODE_SYSTEM,
+        AUTO_MODE_SYSTEM, JULES_MASTER_PROMPT, JULES_QUESTION_HANDLER,
+        REVIEW_SESSION_PROMPT,
+    )
+    defaults = {
+        "ask-mode": ASK_MODE_SYSTEM,
+        "plan-mode": PLAN_MODE_SYSTEM,
+        "build-mode": BUILD_MODE_SYSTEM,
+        "auto-mode": AUTO_MODE_SYSTEM,
+        "jules-master": JULES_MASTER_PROMPT,
+        "jules-question-handler": JULES_QUESTION_HANDLER,
+        "review-session": REVIEW_SESSION_PROMPT,
+    }
+    if name not in defaults:
+        raise HTTPException(404, f"Unknown system prompt '{name}'")
+    await db.delete("prompts", {"name": name, "source": "system"})
+    return {"content": defaults[name]}
+
+
 @app.get("/api/prompts/{name}")
 async def get_prompt(name: str):
     rows = await db.select("prompts", filters={"name": name})
@@ -101,6 +153,8 @@ async def delete_prompt(name: str):
     rows = await db.select("prompts", filters={"name": name})
     if not rows:
         raise HTTPException(404, f"Prompt '{name}' not found")
+    if rows[0].get("source") == "system":
+        raise HTTPException(403, "System prompts cannot be deleted")
     await db.delete("prompts", {"name": name})
     return {"ok": True}
 

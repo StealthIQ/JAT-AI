@@ -93,9 +93,6 @@ export const PromptsPrimaryView = ({ enabled, onSidebarContent }: PromptsPrimary
       onSelectPrompt={selectPromptLibraryItem}
       onRefresh={() => { void refreshPrompts(); }}
       onNewPrompt={() => { setShowTemplatePopup(true); }}
-      activeTerminalId={null}
-      onRestoreTerminal={() => { if (newPromptMode) setNewPromptMode(true); }}
-      onCloseTerminal={() => { setNewPromptMode(false); }}
     />
   );
 
@@ -105,6 +102,24 @@ export const PromptsPrimaryView = ({ enabled, onSidebarContent }: PromptsPrimary
   }, [prompts, selectedPromptName, isLoadingPrompts, newPromptMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const promptCategory: PromptCategory = selectedPrompt?.source === "user" ? "skill" : "general";
+
+  const isSystemPrompt = selectedPrompt?.source === "system";
+
+  const [resetting, setResetting] = useState(false);
+
+  const handleReset = useCallback(async () => {
+    if (!selectedPromptName) return;
+    setResetting(true);
+    try {
+      const res = await fetch(`/api/prompts/system/${selectedPromptName}/reset`, { method: "POST" });
+      if (res.ok) {
+        selectPromptLibraryItem(selectedPromptName);
+        void onRefresh();
+      }
+    } finally {
+      setResetting(false);
+    }
+  }, [selectedPromptName, selectPromptLibraryItem, onRefresh]);
 
   return (
     <section className="prompts-view" aria-label="Prompts primary view">
@@ -265,7 +280,7 @@ export const PromptsPrimaryView = ({ enabled, onSidebarContent }: PromptsPrimary
                 <div className="prompts-detail-header-left">
                   <h3 className="prompts-detail-name">{selectedPrompt.name}</h3>
                   <span className="prompts-detail-source-badge" data-source={selectedPrompt.source}>
-                    {selectedPrompt.source === "user" ? "Skill" : "Built-in"}
+                    {selectedPrompt.source === "user" ? "Custom" : selectedPrompt.source === "system" ? "System" : "Skill"}
                   </span>
                   <button
                     type="button"
@@ -299,7 +314,13 @@ export const PromptsPrimaryView = ({ enabled, onSidebarContent }: PromptsPrimary
                         setShowXml(false);
                         onStartEditing();
                       }}>Edit</ActionButton>
-                      <ActionButton onClick={() => setConfirmDelete(true)}>Delete</ActionButton>
+                      {isSystemPrompt ? (
+                        <ActionButton onClick={() => void handleReset()}>
+                          {resetting ? "Resetting..." : "Reset"}
+                        </ActionButton>
+                      ) : (
+                        <ActionButton onClick={() => setConfirmDelete(true)}>Delete</ActionButton>
+                      )}
                     </>
                   )}
                 </div>

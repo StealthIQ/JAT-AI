@@ -65,9 +65,18 @@ export const usePromptLibrary = ({
     fetch(buildPromptItemUrl(name))
       .then(async (res) => {
         if (requestId !== detailRequestRef.current) return;
-        if (!res.ok) throw new Error("Prompt not found");
-        const data = (await res.json()) as PromptDetail;
-        setSelectedPromptDetail(data);
+        if (res.ok) {
+          const data = (await res.json()) as PromptDetail;
+          setSelectedPromptDetail(data);
+          return;
+        }
+        // Not in DB — check system prompts
+        const sysRes = await fetch("/api/prompts/system");
+        if (!sysRes.ok) throw new Error("Prompt not found");
+        const sysData = (await sysRes.json()) as { prompts: { name: string; content: string }[] };
+        const match = sysData.prompts.find((p) => p.name === name);
+        if (!match) throw new Error("Prompt not found");
+        setSelectedPromptDetail({ name: match.name, source: "system", content: match.content });
       })
       .catch((err) => {
         if (requestId !== detailRequestRef.current) return;
@@ -140,14 +149,22 @@ export const usePromptLibrary = ({
     if (!selectedPromptName) return false;
     setErrorMessage(null);
     try {
-      const res = await fetch(buildPromptItemUrl(selectedPromptName), {
+      const isSystem = selectedPromptDetail?.source === "system";
+      const url = isSystem
+        ? `/api/prompts/system/${encodeURIComponent(selectedPromptName)}`
+        : buildPromptItemUrl(selectedPromptName);
+      const res = await fetch(url, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: editDraft }),
       });
       if (!res.ok) throw new Error("Failed to update prompt");
-      const data = (await res.json()) as PromptDetail;
-      setSelectedPromptDetail(data);
+      if (isSystem) {
+        setSelectedPromptDetail({ name: selectedPromptName, source: "system", content: editDraft });
+      } else {
+        const data = (await res.json()) as PromptDetail;
+        setSelectedPromptDetail(data);
+      }
       setIsEditing(false);
       setEditDraft("");
       await refreshPrompts();
@@ -156,7 +173,7 @@ export const usePromptLibrary = ({
       setErrorMessage(err instanceof Error ? err.message : "Failed to update prompt");
       return false;
     }
-  }, [selectedPromptName, editDraft, refreshPrompts]);
+  }, [selectedPromptName, selectedPromptDetail, editDraft, refreshPrompts]);
 
   useEffect(() => {
     if (enabled) {

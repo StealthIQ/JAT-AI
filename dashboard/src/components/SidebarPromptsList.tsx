@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import type { PromptLibraryEntry } from "../app/types";
 
@@ -9,10 +9,9 @@ type SidebarPromptsListProps = {
   onSelectPrompt: (name: string) => void;
   onRefresh: () => void;
   onNewPrompt: () => void;
-  activeTerminalId: string | null;
-  onRestoreTerminal: () => void;
-  onCloseTerminal: () => void;
 };
+
+type SystemPromptEntry = { name: string; content: string };
 
 export const SidebarPromptsList = ({
   prompts,
@@ -21,21 +20,34 @@ export const SidebarPromptsList = ({
   onSelectPrompt,
   onRefresh,
   onNewPrompt,
-  activeTerminalId,
-  onRestoreTerminal,
-  onCloseTerminal,
 }: SidebarPromptsListProps) => {
   const [search, setSearch] = useState("");
+  const [systemOpen, setSystemOpen] = useState(true);
   const [skillsOpen, setSkillsOpen] = useState(true);
   const [customOpen, setCustomOpen] = useState(true);
+  const [systemPrompts, setSystemPrompts] = useState<SystemPromptEntry[]>([]);
+
+  useEffect(() => {
+    fetch("/api/prompts/system")
+      .then((r) => r.json())
+      .then((data) => setSystemPrompts(data.prompts ?? []))
+      .catch(() => {});
+  }, []);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return prompts;
     const q = search.toLowerCase();
     return prompts.filter((p) => p.name.toLowerCase().includes(q));
   }, [prompts, search]);
-  const userPrompts = useMemo(() => filtered.filter((p) => p.source === "user"), [filtered]);
+
+  const filteredSystem = useMemo(() => {
+    if (!search.trim()) return systemPrompts;
+    const q = search.toLowerCase();
+    return systemPrompts.filter((p) => p.name.toLowerCase().includes(q));
+  }, [systemPrompts, search]);
+
   const builtinPrompts = useMemo(() => filtered.filter((p) => p.source === "builtin"), [filtered]);
+  const userPrompts = useMemo(() => filtered.filter((p) => p.source === "user"), [filtered]);
 
   return (
     <div className="sidebar-prompts">
@@ -52,15 +64,29 @@ export const SidebarPromptsList = ({
 
       {isLoadingPrompts && prompts.length === 0 ? (
         <p className="sidebar-prompts-empty">Loading...</p>
-      ) : filtered.length === 0 ? (
+      ) : filtered.length === 0 && filteredSystem.length === 0 ? (
         <p className="sidebar-prompts-empty">{search ? "No matches" : "No prompts yet"}</p>
       ) : (
         <div className="sidebar-prompts-list">
+          {filteredSystem.length > 0 && (
+            <div className="sidebar-prompts-group">
+              <button type="button" className="sidebar-prompts-group-toggle" onClick={() => setSystemOpen((o) => !o)}>
+                <span className="sidebar-prompts-group-name">System ({filteredSystem.length})</span>
+                <span className={`sidebar-prompts-arrow${systemOpen ? " is-open" : ""}`}>▶</span>
+              </button>
+              {systemOpen && filteredSystem.map((p) => (
+                <button key={p.name} type="button" className="sidebar-prompts-item" data-active={selectedPromptName === p.name ? "true" : undefined} onClick={() => onSelectPrompt(p.name)}>
+                  {p.name}
+                </button>
+              ))}
+            </div>
+          )}
+
           {builtinPrompts.length > 0 && (
             <div className="sidebar-prompts-group">
               <button type="button" className="sidebar-prompts-group-toggle" onClick={() => setSkillsOpen((o) => !o)}>
+                <span className="sidebar-prompts-group-name">Skills ({builtinPrompts.length})</span>
                 <span className={`sidebar-prompts-arrow${skillsOpen ? " is-open" : ""}`}>▶</span>
-                Skills ({builtinPrompts.length})
               </button>
               {skillsOpen && builtinPrompts.map((p) => (
                 <button key={p.name} type="button" className="sidebar-prompts-item" data-active={selectedPromptName === p.name ? "true" : undefined} onClick={() => onSelectPrompt(p.name)}>
@@ -73,8 +99,8 @@ export const SidebarPromptsList = ({
           {userPrompts.length > 0 && (
             <div className="sidebar-prompts-group">
               <button type="button" className="sidebar-prompts-group-toggle" onClick={() => setCustomOpen((o) => !o)}>
+                <span className="sidebar-prompts-group-name">Custom Prompts ({userPrompts.length})</span>
                 <span className={`sidebar-prompts-arrow${customOpen ? " is-open" : ""}`}>▶</span>
-                Custom Prompts ({userPrompts.length})
               </button>
               {customOpen && userPrompts.map((p) => (
                 <button key={p.name} type="button" className="sidebar-prompts-item" data-active={selectedPromptName === p.name ? "true" : undefined} onClick={() => onSelectPrompt(p.name)}>
@@ -83,16 +109,6 @@ export const SidebarPromptsList = ({
               ))}
             </div>
           )}
-        </div>
-      )}
-
-      {activeTerminalId && (
-        <div className="sidebar-prompts-minimized-terminal">
-          <button type="button" className="sidebar-prompts-minimized-terminal-restore" onClick={onRestoreTerminal}>
-            <span className="sidebar-prompts-minimized-terminal-icon">{">_"}</span>
-            <span className="sidebar-prompts-minimized-terminal-label">Prompt Engineer</span>
-          </button>
-          <button type="button" className="sidebar-prompts-minimized-terminal-close" onClick={onCloseTerminal} aria-label="Close terminal">x</button>
         </div>
       )}
     </div>

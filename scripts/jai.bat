@@ -35,7 +35,7 @@ if not exist "%ROOT%\dashboard\node_modules" (
 :: Start backend
 echo [BACKEND] Starting FastAPI on port %BACKEND_PORT%...
 cd /d "%ROOT%"
-start /b "" python -m uvicorn api.server:app --port %BACKEND_PORT% --reload --app-dir src >nul 2>&1
+start /b "" python -m uvicorn api.server:app --port %BACKEND_PORT% --reload --app-dir src
 
 :: Wait for backend to be ready
 echo [BACKEND] Waiting for server...

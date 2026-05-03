@@ -81,6 +81,12 @@
   border: 1px solid color-mix(in srgb, #6ea8fe 25%, #2b2f36);
 }
 
+.prompts-detail-source-badge[data-source="system"] {
+  background: color-mix(in srgb, #a78bfa 14%, #11161d);
+  color: color-mix(in srgb, #a78bfa 60%, #e6ebf3);
+  border: 1px solid color-mix(in srgb, #a78bfa 30%, #2b2f36);
+}
+
 .prompts-detail-header-actions {
   display: inline-flex;
   align-items: center;
@@ -339,7 +345,7 @@
 .sidebar-prompts-group-toggle {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  justify-content: space-between;
   width: 100%;
   padding: 0.28rem 0.4rem 0.14rem;
   background: none;
@@ -356,6 +362,10 @@
 
 .sidebar-prompts-group-toggle:hover {
   color: #e6e8ec;
+}
+
+.sidebar-prompts-group-name {
+  flex: 1;
 }
 
 .sidebar-prompts-arrow {
