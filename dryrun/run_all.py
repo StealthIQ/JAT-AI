@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from dryrun.test_full_workflow import main as workflow_main
 from dryrun.test_auto_mode import main as auto_main
 from dryrun.test_jdocs import main as jdocs_main
+from dryrun.test_e2e_simulation import main as e2e_main
 
 
 async def run_all():
@@ -22,6 +23,8 @@ async def run_all():
     await auto_main()
     print()
     await jdocs_main()
+    print()
+    await e2e_main()
     print()
     print("*" * 50)
     print("ALL DRY RUN SUITES PASSED")
