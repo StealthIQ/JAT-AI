@@ -14,6 +14,7 @@ from dryrun.test_full_workflow import main as workflow_main
 from dryrun.test_auto_mode import main as auto_main
 from dryrun.test_jdocs import main as jdocs_main
 from dryrun.test_e2e_simulation import main as e2e_main
+from dryrun.test_gaps import main as gaps_main
 
 
 async def run_all():
@@ -25,6 +26,8 @@ async def run_all():
     await jdocs_main()
     print()
     await e2e_main()
+    print()
+    await gaps_main()
     print()
     print("*" * 50)
     print("ALL DRY RUN SUITES PASSED")

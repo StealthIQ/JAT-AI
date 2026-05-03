@@ -108,6 +108,14 @@ async def send_message_to_session(session_id: str, message: str, jules_key: str)
     return res.status_code == 200
 
 
+async def _approve_plan(session_id: str, jules_key: str) -> bool:
+    url = f"https://jules.googleapis.com/v1alpha/sessions/{session_id}:approvePlan"
+    headers = {"X-Goog-Api-Key": jules_key, "Content-Type": "application/json"}
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        res = await client.post(url, json={}, headers=headers)
+    return res.status_code == 200
+
+
 async def _answer_jules_question(session_data: dict, task_context: str, ai_key: str, ai_provider: str, ai_model: str) -> str:
     from api.chat import _call_provider
     question = session_data.get("lastMessage", {}).get("content", "Unknown question")
@@ -136,7 +144,9 @@ async def poll_session_status(
         state = data.get("state", "")
         if state in ("COMPLETED", "FAILED"):
             return data
-        if state == "AWAITING_USER_INPUT" and ai_key:
+        if state == "AWAITING_PLAN_APPROVAL":
+            await _approve_plan(session_id, jules_key)
+        elif state == "AWAITING_USER_INPUT" and ai_key:
             answer = await _answer_jules_question(data, task_context, ai_key, ai_provider, ai_model)
             await send_message_to_session(session_id, answer, jules_key)
         await asyncio.sleep(15)
@@ -152,4 +162,8 @@ async def get_jules_key() -> str | None:
     enabled = [r for r in rows if r.get("enabled", True)]
     if not enabled:
         return None
-    return enabled[0].get("api_key", "")
+    best = min(enabled, key=lambda r: r.get("sessions_today", 0))
+    daily_limit = best.get("max_daily_tasks", 300)
+    if best.get("sessions_today", 0) >= daily_limit:
+        return None
+    return best.get("api_key", "")

@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from config import load_settings
+from clients.supabase import SupabaseClient
 from core.plan_executor import (
     parse_plan,
     create_branch_from_ref,
@@ -19,6 +20,20 @@ from core.plan_executor import (
 
 router = APIRouter()
 settings = load_settings()
+db = SupabaseClient(settings.supabase_url, settings.supabase_key)
+
+
+async def _track_task(task: AgentTask, plan: ExecutionPlan, status: str, session_id: str | None = None):
+    try:
+        await db.insert("agent_tasks", {
+            "prompt": task.description[:500],
+            "repo_owner": plan.repo_owner,
+            "repo_name": plan.repo_name,
+            "status": status,
+            "session_id": session_id or "",
+        })
+    except Exception:
+        pass
 
 
 class ExecuteRequest(BaseModel):
@@ -54,16 +69,15 @@ async def _update_jdocs(plan: ExecutionPlan, task: AgentTask, status: str, sessi
     )
 
 
-async def _run_task(task: AgentTask, plan: ExecutionPlan, base_sha: str, jules_key: str, token: str) -> TaskResult:
+async def _run_task_once(task: AgentTask, plan: ExecutionPlan, base_sha: str, jules_key: str, token: str) -> TaskResult:
+    await _track_task(task, plan, "running")
     branch_created = await create_branch_from_ref(
         plan.repo_owner, plan.repo_name, task.branch_name, base_sha, token
     )
     if not branch_created:
         return TaskResult(task_id=task.id, status="failed", error="Branch creation failed")
 
-    prompt = task.description
-    if task.exit_criteria:
-        prompt += f"\n\nExit criteria: {task.exit_criteria}"
+    prompt = await _resolve_prompt(task)
 
     session_id = await create_jules_session(
         prompt=prompt,
@@ -78,6 +92,9 @@ async def _run_task(task: AgentTask, plan: ExecutionPlan, base_sha: str, jules_k
     result = await poll_session_status(session_id, jules_key, plan.timeout_minutes)
     state = result.get("state", "UNKNOWN")
 
+    if state == "TIMEOUT":
+        return TaskResult(task_id=task.id, status="failed", session_id=session_id, error=f"Session timed out after {plan.timeout_minutes}min (still running on Jules)")
+
     pr_url = None
     outputs = result.get("outputs", [])
     for out in outputs:
@@ -86,6 +103,7 @@ async def _run_task(task: AgentTask, plan: ExecutionPlan, base_sha: str, jules_k
             break
 
     status = "completed" if state == "COMPLETED" else "failed"
+    await _track_task(task, plan, status, session_id)
     await _update_jdocs(plan, task, status, session_id or "", pr_url, token)
 
     return TaskResult(
@@ -95,6 +113,31 @@ async def _run_task(task: AgentTask, plan: ExecutionPlan, base_sha: str, jules_k
         pr_url=pr_url,
         error=None if state == "COMPLETED" else f"Session ended with state: {state}",
     )
+
+
+async def _resolve_prompt(task: AgentTask) -> str:
+    prompt = task.description
+    if task.prompt_id:
+        try:
+            rows = await db.select("prompts", filters={"name": task.prompt_id})
+            if rows:
+                prompt = rows[0].get("content", "") + "\n\n" + prompt
+        except Exception:
+            pass
+    if task.exit_criteria:
+        prompt += f"\n\nExit criteria: {task.exit_criteria}"
+    return prompt
+
+
+async def _run_task(task: AgentTask, plan: ExecutionPlan, base_sha: str, jules_key: str, token: str) -> TaskResult:
+    max_retries = plan.max_retries if hasattr(plan, "max_retries") else 2
+    for attempt in range(max_retries + 1):
+        result = await _run_task_once(task, plan, base_sha, jules_key, token)
+        if result.status == "completed":
+            return result
+        if attempt < max_retries:
+            task.branch_name = f"{task.branch_name}-retry{attempt + 1}"
+    return result
 
 
 async def _execute_sequential(plan: ExecutionPlan, jules_key: str, token: str) -> list[TaskResult]:

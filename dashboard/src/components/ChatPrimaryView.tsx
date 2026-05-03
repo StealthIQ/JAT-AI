@@ -67,6 +67,22 @@ export const ChatPrimaryView = () => {
   const activeConv = conversations.find((c) => c.id === activeConvId) ?? null;
 
   useEffect(() => {
+    fetch("/api/conversations").then((r) => r.json()).then((d) => {
+      const convs = (d.conversations ?? []).map((c: any) => ({
+        id: c.id,
+        title: c.title || "Untitled",
+        messages: [],
+        createdAt: c.created_at,
+        model: c.model,
+      }));
+      if (convs.length > 0) {
+        setConversations(convs);
+        setActiveConvId(convs[0].id);
+      }
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
     fetch("/api/providers").then((r) => r.json()).then((d) => {
       const enabled = (d.providers ?? []).filter((p: ProviderInfo) => p.enabled);
       const grouped: Record<string, { type: string; keyCount: number; ids: string[] }> = {};
@@ -153,6 +169,12 @@ export const ChatPrimaryView = () => {
     setIsTyping(true);
     setUsage((u) => ({ ...u, requestsToday: u.requestsToday + 1, tokensUsed: u.tokensUsed + currentInput.length }));
 
+    fetch(`/api/conversations/${activeConvId}/messages`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role: "user", content: currentInput }),
+    }).catch(() => {});
+
     const conv = conversations.find((c) => c.id === activeConvId);
     const history = [...(conv?.messages ?? []), { role: "user", content: currentInput }]
       .map((m) => ({ role: m.role, content: m.content }));
@@ -175,6 +197,11 @@ export const ChatPrimaryView = () => {
         const assistantMsg: Message = { id: `m-${Date.now() + 1}`, role: "assistant", content, timestamp: new Date().toISOString(), model: selectedModel };
         setConversations((prev) => prev.map((c) => c.id === activeConvId ? { ...c, messages: [...c.messages, assistantMsg] } : c));
         setUsage((u) => ({ ...u, tokensUsed: u.tokensUsed + content.length }));
+        fetch(`/api/conversations/${activeConvId}/messages`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ role: "assistant", content }),
+        }).catch(() => {});
       })
       .catch(() => {
         const errMsg: Message = { id: `m-${Date.now() + 1}`, role: "assistant", content: "Failed to get response. Check backend.", timestamp: new Date().toISOString() };
