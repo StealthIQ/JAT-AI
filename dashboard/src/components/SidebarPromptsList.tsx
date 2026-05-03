@@ -22,9 +22,9 @@ export const SidebarPromptsList = ({
   onNewPrompt,
 }: SidebarPromptsListProps) => {
   const [search, setSearch] = useState("");
-  const [systemOpen, setSystemOpen] = useState(true);
-  const [skillsOpen, setSkillsOpen] = useState(true);
-  const [customOpen, setCustomOpen] = useState(true);
+  const [systemOpen, setSystemOpen] = useState(false);
+  const [skillsOpen, setSkillsOpen] = useState(false);
+  const [customOpen, setCustomOpen] = useState(false);
   const [systemPrompts, setSystemPrompts] = useState<SystemPromptEntry[]>([]);
 
   useEffect(() => {
