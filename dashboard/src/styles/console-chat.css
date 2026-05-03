@@ -444,3 +444,54 @@
   color: #ef4444;
   font-size: 0.72rem;
 }
+
+.chat-mode-selector {
+  display: flex;
+  gap: 2px;
+  border: 1px solid #2b2f36;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.chat-mode-btn {
+  padding: 0.3rem 0.6rem;
+  background: #141920;
+  border: none;
+  color: #6b7a90;
+  font-family: var(--font-main);
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.chat-mode-btn:hover {
+  background: #1c2430;
+  color: #a9b0ba;
+}
+
+.chat-mode-btn.is-active {
+  background: color-mix(in srgb, var(--accent-primary) 20%, #11161d);
+  color: var(--accent-primary);
+}
+
+.chat-start-btn {
+  padding: 0.35rem 0.8rem;
+  background: color-mix(in srgb, var(--accent-primary) 18%, #11161d);
+  border: 1px solid var(--accent-primary);
+  border-radius: 4px;
+  color: var(--accent-primary);
+  font-family: var(--font-main);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chat-start-btn:hover {
+  background: color-mix(in srgb, var(--accent-primary) 30%, #11161d);
+}
+
+.chat-start-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

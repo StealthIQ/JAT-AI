@@ -58,8 +58,10 @@ export const ChatPrimaryView = () => {
   const repoDropdownRef = useRef<HTMLDivElement>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [imageError, setImageError] = useState("");
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const [mode, setMode] = useState<"ask" | "plan" | "build">("ask");
+  const [isStarted, setIsStarted] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [usage, setUsage] = useState({ tokensUsed: 0, tokensLimit: 0, rpm: 0, rpmLimit: 40, requestsToday: 0, resetIn: "24h" });
 
   const activeConv = conversations.find((c) => c.id === activeConvId) ?? null;
@@ -146,29 +148,47 @@ export const ChatPrimaryView = () => {
     if (!input.trim() || !activeConvId) return;
     const userMsg: Message = { id: `m-${Date.now()}`, role: "user", content: input.trim(), timestamp: new Date().toISOString() };
     setConversations((prev) => prev.map((c) => c.id === activeConvId ? { ...c, messages: [...c.messages, userMsg] } : c));
+    const currentInput = input.trim();
     setInput("");
     setIsTyping(true);
-    setUsage((u) => ({ ...u, requestsToday: u.requestsToday + 1, tokensUsed: u.tokensUsed + input.length }));
+    setUsage((u) => ({ ...u, requestsToday: u.requestsToday + 1, tokensUsed: u.tokensUsed + currentInput.length }));
 
-    setTimeout(() => {
-      const assistantMsg: Message = { id: `m-${Date.now() + 1}`, role: "assistant", content: "Mock response. Wire provider to get real answers.", timestamp: new Date().toISOString(), model: selectedModel };
-      setConversations((prev) => prev.map((c) => c.id === activeConvId ? { ...c, messages: [...c.messages, assistantMsg] } : c));
-      setIsTyping(false);
-      setUsage((u) => ({ ...u, tokensUsed: u.tokensUsed + 50 }));
-    }, 1200);
-  }, [input, activeConvId, selectedModel]);
+    const conv = conversations.find((c) => c.id === activeConvId);
+    const history = [...(conv?.messages ?? []), { role: "user", content: currentInput }]
+      .map((m) => ({ role: m.role, content: m.content }));
 
-  const VISION_PATTERNS = /vision|gpt-4o|gemini|claude-3|llava|pixtral|qwen-vl|internvl/i;
+    fetch("/api/chat/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        provider_type: selectedProviderType,
+        model: selectedModel,
+        messages: history,
+        image_base64: imagePreview ?? undefined,
+        repo: selectedRepo ? `iceyxsm/${selectedRepo}` : undefined,
+      }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        const content = data.response ?? data.detail ?? "No response";
+        const assistantMsg: Message = { id: `m-${Date.now() + 1}`, role: "assistant", content, timestamp: new Date().toISOString(), model: selectedModel };
+        setConversations((prev) => prev.map((c) => c.id === activeConvId ? { ...c, messages: [...c.messages, assistantMsg] } : c));
+        setUsage((u) => ({ ...u, tokensUsed: u.tokensUsed + content.length }));
+      })
+      .catch(() => {
+        const errMsg: Message = { id: `m-${Date.now() + 1}`, role: "assistant", content: "Failed to get response. Check backend.", timestamp: new Date().toISOString() };
+        setConversations((prev) => prev.map((c) => c.id === activeConvId ? { ...c, messages: [...c.messages, errMsg] } : c));
+      })
+      .finally(() => {
+        setIsTyping(false);
+        setImageFile(null);
+        setImagePreview(null);
+      });
+  }, [input, activeConvId, selectedModel, selectedProviderType, conversations, imagePreview]);
 
   const handleImageSelect = useCallback(() => {
-    const supportsVision = VISION_PATTERNS.test(selectedModel);
-    if (!supportsVision) {
-      setImageError("This model does not support image inputs. Select a vision-capable model.");
-      setTimeout(() => setImageError(""), 4000);
-      return;
-    }
     imageInputRef.current?.click();
-  }, [selectedModel]);
+  }, []);
 
   const handleImageChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -185,10 +205,49 @@ export const ChatPrimaryView = () => {
     setImagePreview(null);
   }, []);
 
+  const handleStart = useCallback(() => {
+    if (!selectedRepo || !selectedProviderType || !selectedModel || !activeConvId) return;
+    setIsAnalyzing(true);
+    const owner = "iceyxsm";
+    fetch(`/api/repos/${owner}/${selectedRepo}/analyze`, { method: "POST" })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.xml) {
+          const systemMsg = `Analyze this codebase and provide a structured summary:\n\n${data.xml.slice(0, 80000)}`;
+          return fetch("/api/chat/send", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              provider_type: selectedProviderType,
+              model: selectedModel,
+              messages: [{ role: "user", content: "Analyze this repo and give me a structured summary: project name, tech stack, structure, and what it does." }],
+              system: systemMsg,
+              repo: `${owner}/${selectedRepo}`,
+            }),
+          });
+        }
+        throw new Error(data.detail ?? "Analysis failed");
+      })
+      .then((r) => r?.json())
+      .then((data) => {
+        if (data?.response) {
+          const msg: Message = { id: `m-${Date.now()}`, role: "assistant", content: data.response, timestamp: new Date().toISOString(), model: selectedModel };
+          setConversations((prev) => prev.map((c) => c.id === activeConvId ? { ...c, messages: [...c.messages, msg] } : c));
+          setIsStarted(true);
+        }
+      })
+      .catch((e) => {
+        const errMsg: Message = { id: `m-${Date.now()}`, role: "assistant", content: `Start failed: ${e.message}`, timestamp: new Date().toISOString() };
+        setConversations((prev) => prev.map((c) => c.id === activeConvId ? { ...c, messages: [...c.messages, errMsg] } : c));
+      })
+      .finally(() => setIsAnalyzing(false));
+  }, [selectedRepo, selectedProviderType, selectedModel, activeConvId]);
+
   const handleNewConversation = useCallback(() => {
     const newConv: Conversation = { id: `conv-${Date.now()}`, title: "New conversation", messages: [], createdAt: new Date().toISOString() };
     setConversations((prev) => [newConv, ...prev]);
     setActiveConvId(newConv.id);
+    setIsStarted(false);
   }, []);
 
   return (
@@ -340,6 +399,29 @@ export const ChatPrimaryView = () => {
                   </div>
                 )}
               </div>
+              <div className="chat-header-spacer" />
+              <div className="chat-mode-selector">
+                {(["ask", "plan", "build"] as const).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    className={`chat-mode-btn${mode === m ? " is-active" : ""}`}
+                    onClick={() => setMode(m)}
+                  >
+                    {m.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+              {!isStarted && (
+                <button
+                  type="button"
+                  className="chat-start-btn"
+                  onClick={handleStart}
+                  disabled={!selectedRepo || !selectedModel || isAnalyzing}
+                >
+                  {isAnalyzing ? "Analyzing..." : "Start"}
+                </button>
+              )}
               <div className="chat-usage-stats">
                 <div className="chat-usage-bar-group">
                   <span className="chat-usage-label">Tokens</span>
@@ -406,9 +488,6 @@ export const ChatPrimaryView = () => {
                 Send
               </button>
             </div>
-            {imageError && (
-              <div className="chat-image-error">{imageError}</div>
-            )}
           </>
         ) : (
           <div className="chat-empty">Select a conversation or start a new one.</div>

@@ -6,6 +6,7 @@
   background: #0b0d10;
   overflow-y: auto;
   padding: 1.5rem 2rem;
+  position: relative;
 }
 
 .jules-content {
@@ -18,6 +19,7 @@
   align-items: center;
   gap: 1rem;
   margin-bottom: 1rem;
+  width: 100%;
 }
 
 .jules-title {
@@ -29,6 +31,8 @@
 
 .jules-add-btn {
   margin-left: auto;
+  position: absolute;
+  right: 2rem;
   padding: 0.4rem 0.8rem;
   background: color-mix(in srgb, var(--accent-primary) 14%, #11161d);
   border: 1px solid color-mix(in srgb, var(--accent-primary) 40%, #2b2f36);
