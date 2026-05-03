@@ -7,10 +7,9 @@ from dataclasses import dataclass, field
 import httpx
 
 from config import load_settings
-from clients.supabase import SupabaseClient
+from db import db
 
 settings = load_settings()
-db = SupabaseClient(settings.supabase_url, settings.supabase_key)
 
 
 @dataclass

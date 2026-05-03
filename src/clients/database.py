@@ -16,12 +16,6 @@ class DBMode(str, Enum):
 
 
 class Database:
-    """
-    Unified database interface. Routes operations based on mode:
-    - local: SQLite only, zero network dependency
-    - supabase: remote Supabase only
-    - hybrid: reads from local (fast), writes to both, background sync
-    """
 
     def __init__(self, mode: str = "local", local_path: str = "./data/jat.db", sync_interval: int = 30):
         self._mode = DBMode(mode)
@@ -35,12 +29,12 @@ class Database:
         if self._mode == DBMode.SUPABASE and self._local:
             self._local = None
 
-    async def select(self, table: str, filters: dict[str, Any] | None = None) -> list[dict]:
+    async def select(self, table: str, filters: dict[str, Any] | None = None, columns: str | None = None) -> list[dict]:
         if self._mode == DBMode.LOCAL:
-            return await self._local.select(table, filters)
+            return await self._local.select(table, filters, columns)
         if self._mode == DBMode.SUPABASE:
-            return await self._remote_select(table, filters)
-        return await self._local.select(table, filters)
+            return await self._remote_select(table, filters, columns)
+        return await self._local.select(table, filters, columns)
 
     async def insert(self, table: str, data: dict[str, Any]) -> dict:
         if self._mode == DBMode.LOCAL:
@@ -51,32 +45,38 @@ class Database:
         asyncio.create_task(self._sync_insert(table, data))
         return result
 
-    async def update(self, table: str, id_val: str, data: dict[str, Any]) -> dict:
+    async def update(self, table: str, data: dict[str, Any], filters: dict[str, Any] | None = None) -> list[dict]:
         if self._mode == DBMode.LOCAL:
-            return await self._local.update(table, id_val, data)
+            return await self._local.update(table, data, filters)
         if self._mode == DBMode.SUPABASE:
-            return await self._remote_update(table, id_val, data)
-        result = await self._local.update(table, id_val, data)
-        asyncio.create_task(self._sync_update(table, id_val, data))
+            id_val = filters.get("id", "") if filters else ""
+            return [await self._remote_update(table, id_val, data)]
+        result = await self._local.update(table, data, filters)
+        id_val = filters.get("id", "") if filters else ""
+        if id_val:
+            asyncio.create_task(self._sync_update(table, id_val, data))
         return result
 
-    async def delete(self, table: str, id_val: str) -> bool:
+    async def delete(self, table: str, filters: dict[str, Any] | str | None = None) -> bool:
         if self._mode == DBMode.LOCAL:
-            return await self._local.delete(table, id_val)
+            return await self._local.delete(table, filters)
+        id_val = filters.get("id", "") if isinstance(filters, dict) else (filters or "")
         if self._mode == DBMode.SUPABASE:
             return await self._remote_delete(table, id_val)
-        await self._local.delete(table, id_val)
-        asyncio.create_task(self._sync_delete(table, id_val))
+        await self._local.delete(table, filters)
+        if id_val:
+            asyncio.create_task(self._sync_delete(table, id_val))
         return True
 
     @property
     def mode(self) -> str:
         return self._mode.value
 
-    async def _remote_select(self, table: str, filters: dict[str, Any] | None) -> list[dict]:
+    async def _remote_select(self, table: str, filters: dict[str, Any] | None, columns: str | None = None) -> list[dict]:
         if not self._remote:
             return []
-        query = self._remote.client.table(table).select("*")
+        cols = columns if columns else "*"
+        query = self._remote.client.table(table).select(cols)
         if filters:
             for k, v in filters.items():
                 query = query.eq(k, v)

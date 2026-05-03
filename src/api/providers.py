@@ -3,11 +3,10 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from clients.supabase import SupabaseClient
 from config import load_settings
+from db import db
 
 settings = load_settings()
-db = SupabaseClient(settings.supabase_url, settings.supabase_key)
 
 router = APIRouter(prefix="/api/providers")
 

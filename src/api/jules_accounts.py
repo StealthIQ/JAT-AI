@@ -4,13 +4,12 @@ import httpx
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from clients.supabase import SupabaseClient
 from config import load_settings
 from core.ai_interface import KeyVault
+from db import db
 
 router = APIRouter()
 settings = load_settings()
-db = SupabaseClient(settings.supabase_url, settings.supabase_key)
 vault = KeyVault(settings.encryption_key)
 
 PLAN_LIMITS = {

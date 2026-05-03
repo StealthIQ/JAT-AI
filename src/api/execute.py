@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from config import load_settings
-from clients.supabase import SupabaseClient
+from db import db
 from core.plan_executor import (
     parse_plan,
     create_branch_from_ref,
@@ -20,7 +20,6 @@ from core.plan_executor import (
 
 router = APIRouter()
 settings = load_settings()
-db = SupabaseClient(settings.supabase_url, settings.supabase_key)
 
 
 async def _track_task(task: AgentTask, plan: ExecutionPlan, status: str, session_id: str | None = None):

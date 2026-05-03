@@ -1,4 +1,5 @@
 import sqlite3
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -21,7 +22,11 @@ class LocalDB:
     def _init_tables(self) -> None:
         conn = self._conn
         assert conn is not None
-        conn.executescript("""
+        conn.executescript(self._schema())
+        conn.commit()
+
+    def _schema(self) -> str:
+        return """
             CREATE TABLE IF NOT EXISTS accounts (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL UNIQUE,
@@ -29,6 +34,8 @@ class LocalDB:
                 plan TEXT DEFAULT 'free',
                 enabled INTEGER DEFAULT 1,
                 daily_limit INTEGER DEFAULT 0,
+                sessions_today INTEGER DEFAULT 0,
+                max_daily_tasks INTEGER DEFAULT 300,
                 created_at TEXT DEFAULT (datetime('now'))
             );
             CREATE TABLE IF NOT EXISTS agent_tasks (
@@ -96,23 +103,46 @@ class LocalDB:
                 status TEXT DEFAULT 'pending',
                 created_at TEXT DEFAULT (datetime('now'))
             );
-        """)
+            CREATE TABLE IF NOT EXISTS conversations (
+                id TEXT PRIMARY KEY,
+                title TEXT DEFAULT 'New Conversation',
+                mode TEXT DEFAULT 'ask',
+                repo_owner TEXT DEFAULT '',
+                repo_name TEXT DEFAULT '',
+                model TEXT DEFAULT '',
+                status TEXT DEFAULT 'active',
+                created_at TEXT DEFAULT (datetime('now')),
+                updated_at TEXT DEFAULT (datetime('now'))
+            );
+            CREATE TABLE IF NOT EXISTS conversation_messages (
+                id TEXT PRIMARY KEY,
+                conversation_id TEXT NOT NULL,
+                role TEXT NOT NULL,
+                content TEXT NOT NULL,
+                metadata TEXT DEFAULT '{}',
+                created_at TEXT DEFAULT (datetime('now')),
+                FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
+            );
+        """
         conn.commit()
 
-    async def select(self, table: str, filters: dict[str, Any] | None = None) -> list[dict]:
+    async def select(self, table: str, filters: dict[str, Any] | None = None, columns: str | None = None) -> list[dict]:
         conn = self._get_conn()
+        cols = columns if columns else "*"
         where = ""
         params: list[Any] = []
         if filters:
             clauses = [f"{k} = ?" for k in filters]
             where = " WHERE " + " AND ".join(clauses)
             params = list(filters.values())
-        cursor = conn.execute(f"SELECT * FROM {table}{where}", params)
+        cursor = conn.execute(f"SELECT {cols} FROM {table}{where}", params)
         rows = cursor.fetchall()
         return [dict(row) for row in rows]
 
     async def insert(self, table: str, data: dict[str, Any]) -> dict:
         conn = self._get_conn()
+        if "id" not in data:
+            data["id"] = str(uuid.uuid4())
         keys = list(data.keys())
         placeholders = ", ".join(["?"] * len(keys))
         cols = ", ".join(keys)
@@ -120,17 +150,34 @@ class LocalDB:
         conn.commit()
         return data
 
-    async def update(self, table: str, id_val: str, data: dict[str, Any]) -> dict:
+    async def update(self, table: str, data: dict[str, Any], filters: dict[str, Any] | None = None) -> list[dict]:
         conn = self._get_conn()
         sets = ", ".join([f"{k} = ?" for k in data])
-        params = list(data.values()) + [id_val]
-        conn.execute(f"UPDATE {table} SET {sets} WHERE id = ?", params)
+        params = list(data.values())
+        where = ""
+        if filters:
+            clauses = [f"{k} = ?" for k in filters]
+            where = " WHERE " + " AND ".join(clauses)
+            params.extend(filters.values())
+        elif isinstance(filters, str):
+            where = " WHERE id = ?"
+            params.append(filters)
+        conn.execute(f"UPDATE {table} SET {sets}{where}", params)
         conn.commit()
-        return {**data, "id": id_val}
+        return [data]
 
-    async def delete(self, table: str, id_val: str) -> bool:
+    async def delete(self, table: str, filters: dict[str, Any] | str | None = None) -> bool:
         conn = self._get_conn()
-        conn.execute(f"DELETE FROM {table} WHERE id = ?", [id_val])
+        where = ""
+        params: list[Any] = []
+        if isinstance(filters, dict):
+            clauses = [f"{k} = ?" for k in filters]
+            where = " WHERE " + " AND ".join(clauses)
+            params = list(filters.values())
+        elif isinstance(filters, str):
+            where = " WHERE id = ?"
+            params = [filters]
+        conn.execute(f"DELETE FROM {table}{where}", params)
         conn.commit()
         return True
 

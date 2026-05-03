@@ -14,8 +14,8 @@ from api.chat import router as chat_router
 from api.repos import router as repos_router
 from api.execute import router as execute_router
 from api.conversations import router as conversations_router
-from clients.supabase import SupabaseClient
 from config import load_settings
+from db import db
 
 
 def _now() -> str:
@@ -24,7 +24,6 @@ def _now() -> str:
 
 
 settings = load_settings()
-db = SupabaseClient(settings.supabase_url, settings.supabase_key)
 
 
 @asynccontextmanager
