@@ -129,6 +129,18 @@ async def run_auto_mode(config: AutoModeConfig, state: AutoModeState) -> AutoMod
 
     state.sessions_used = len(results)
     failed = [r for r in results if r.status != "completed"]
+
+    consecutive_failures = 0
+    for r in results:
+        if r.status != "completed":
+            consecutive_failures += 1
+        else:
+            consecutive_failures = 0
+    if consecutive_failures >= 2:
+        state.status = "paused"
+        state.errors.append(f"Auto-paused: {consecutive_failures} consecutive failures")
+        return state
+
     if failed:
         state.errors.extend(f"{r.task_id}: {r.error}" for r in failed)
         state.status = "partial"

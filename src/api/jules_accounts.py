@@ -168,3 +168,66 @@ async def list_jules_sessions(repo: str | None = None):
 
     all_sessions.sort(key=lambda s: s.get("createTime", ""), reverse=True)
     return {"sessions": all_sessions[:100]}
+
+
+@router.get("/api/jules/sessions/{session_id}")
+async def get_session_detail(session_id: str):
+    try:
+        accounts = await db.select("accounts")
+    except Exception:
+        raise HTTPException(404, "DB unavailable")
+
+    for acc in accounts:
+        key_raw = acc.get("api_key", "")
+        try:
+            key = vault.decrypt(key_raw)
+        except Exception:
+            key = key_raw
+
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                res = await client.get(
+                    f"https://jules.googleapis.com/v1alpha/sessions/{session_id}",
+                    headers={"X-Goog-Api-Key": key},
+                )
+            if res.status_code == 200:
+                data = res.json()
+                data["_account_name"] = acc.get("name", "")
+                return data
+        except Exception:
+            continue
+
+    raise HTTPException(404, "Session not found across any account")
+
+
+@router.post("/api/jules/sessions/{session_id}/message")
+async def send_session_message(session_id: str, body: dict):
+    message = body.get("message", "")
+    if not message:
+        raise HTTPException(400, "Message required")
+
+    try:
+        accounts = await db.select("accounts")
+    except Exception:
+        raise HTTPException(500, "DB unavailable")
+
+    for acc in accounts:
+        key_raw = acc.get("api_key", "")
+        try:
+            key = vault.decrypt(key_raw)
+        except Exception:
+            key = key_raw
+
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                res = await client.post(
+                    f"https://jules.googleapis.com/v1alpha/sessions/{session_id}:sendMessage",
+                    headers={"X-Goog-Api-Key": key, "Content-Type": "application/json"},
+                    json={"message": message},
+                )
+            if res.status_code == 200:
+                return {"ok": True, "response": res.json()}
+        except Exception:
+            continue
+
+    raise HTTPException(404, "Session not found or not in awaiting state")
