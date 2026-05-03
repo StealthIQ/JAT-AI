@@ -125,3 +125,46 @@ async def test_account(account_id: str):
         sources = res.json().get("sources", [])
         return {"ok": True, "sources_count": len(sources)}
     return {"ok": False, "error": f"HTTP {res.status_code}", "detail": res.text[:200]}
+
+
+@router.get("/api/jules/sessions")
+async def list_jules_sessions(repo: str | None = None):
+    try:
+        accounts = await db.select("accounts")
+    except Exception:
+        return {"sessions": []}
+
+    all_sessions = []
+    for acc in accounts:
+        if not acc.get("enabled", True):
+            continue
+        key_raw = acc.get("api_key", "")
+        try:
+            key = vault.decrypt(key_raw)
+        except Exception:
+            key = key_raw
+
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                res = await client.get(
+                    "https://jules.googleapis.com/v1alpha/sessions",
+                    headers={"X-Goog-Api-Key": key},
+                )
+            if res.status_code == 200:
+                sessions = res.json().get("sessions", [])
+                for s in sessions:
+                    s["_account_name"] = acc.get("name", "")
+                    s["_account_id"] = str(acc["id"])
+                all_sessions.extend(sessions)
+        except Exception:
+            continue
+
+    if repo:
+        owner, name = repo.split("/", 1) if "/" in repo else ("", repo)
+        all_sessions = [
+            s for s in all_sessions
+            if s.get("repositoryOwner") == owner and s.get("repositoryName") == name
+        ]
+
+    all_sessions.sort(key=lambda s: s.get("createTime", ""), reverse=True)
+    return {"sessions": all_sessions[:100]}

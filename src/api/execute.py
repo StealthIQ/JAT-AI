@@ -236,3 +236,37 @@ async def merge_and_review(request: MergeReviewRequest):
         "pr_url": pr_url,
         "cleanup": cleanup_result,
     }
+
+
+class AutoModeRequest(BaseModel):
+    repo_owner: str
+    repo_name: str
+    goal: str
+    provider_type: str
+    model: str
+    max_sessions: int = 10
+    execution_mode: str = "sequential"
+
+
+@router.post("/api/execute/auto")
+async def start_auto_mode(request: AutoModeRequest):
+    from core.auto_mode import AutoModeConfig, AutoModeState, run_auto_mode
+
+    config = AutoModeConfig(
+        repo_owner=request.repo_owner,
+        repo_name=request.repo_name,
+        goal=request.goal,
+        provider_type=request.provider_type,
+        model=request.model,
+        max_sessions=request.max_sessions,
+        execution_mode=request.execution_mode,
+    )
+    state = AutoModeState()
+    result = await run_auto_mode(config, state)
+
+    return {
+        "status": result.status,
+        "sessions_used": result.sessions_used,
+        "plan": result.plan_json,
+        "errors": result.errors,
+    }
