@@ -40,6 +40,20 @@ class ExecuteResponse(BaseModel):
     results: list[TaskResult]
 
 
+async def _update_jdocs(plan: ExecutionPlan, task: AgentTask, status: str, session_id: str, pr_url: str | None, token: str):
+    from core.jdocs import update_context_after_agent, append_session_history
+    await update_context_after_agent(
+        plan.repo_owner, plan.repo_name, task.branch_name, token,
+        agent_id=task.id, task_description=task.description,
+        status=status, pr_url=pr_url, files_changed=None,
+    )
+    await append_session_history(
+        plan.repo_owner, plan.repo_name, task.branch_name, token,
+        agent_id=task.id, session_id=session_id or "",
+        status=status, prompt_summary=task.description[:200],
+    )
+
+
 async def _run_task(task: AgentTask, plan: ExecutionPlan, base_sha: str, jules_key: str, token: str) -> TaskResult:
     branch_created = await create_branch_from_ref(
         plan.repo_owner, plan.repo_name, task.branch_name, base_sha, token
@@ -71,9 +85,12 @@ async def _run_task(task: AgentTask, plan: ExecutionPlan, base_sha: str, jules_k
             pr_url = out["pull_request"].get("url", "")
             break
 
+    status = "completed" if state == "COMPLETED" else "failed"
+    await _update_jdocs(plan, task, status, session_id or "", pr_url, token)
+
     return TaskResult(
         task_id=task.id,
-        status="completed" if state == "COMPLETED" else "failed",
+        status=status,
         session_id=session_id,
         pr_url=pr_url,
         error=None if state == "COMPLETED" else f"Session ended with state: {state}",
@@ -158,3 +175,64 @@ async def execute_plan(request: ExecuteRequest):
         status="completed" if all_done else "partial",
         results=results,
     )
+
+
+class MergeReviewRequest(BaseModel):
+    repo_owner: str
+    repo_name: str
+    branches: list[str]
+    integration_branch: str = "jat/integration"
+    run_review: bool = True
+    cleanup: bool = True
+
+
+@router.post("/api/execute/merge-review")
+async def merge_and_review(request: MergeReviewRequest):
+    from core.merge_review import (
+        merge_branches, create_integration_branch,
+        run_review_session, cleanup_branches, create_final_pr,
+    )
+    from core.plan_executor import get_default_branch_sha
+
+    token = settings.github_token
+    jules_key = await get_jules_key()
+    if not token:
+        raise HTTPException(400, "No GitHub token configured")
+
+    base_sha = await get_default_branch_sha(request.repo_owner, request.repo_name, token)
+    if not base_sha:
+        raise HTTPException(500, "Could not get base SHA")
+
+    await create_integration_branch(
+        request.repo_owner, request.repo_name, base_sha, request.integration_branch, token
+    )
+
+    merge_results = await merge_branches(
+        request.repo_owner, request.repo_name, request.branches, request.integration_branch, token
+    )
+
+    review_result = None
+    if request.run_review and jules_key:
+        context = "\n".join(f"- {b}: {s}" for b, s in merge_results.items())
+        review_result = await run_review_session(
+            request.repo_owner, request.repo_name, request.integration_branch,
+            jules_key, context,
+        )
+
+    pr_url = await create_final_pr(
+        request.repo_owner, request.repo_name, request.integration_branch,
+        "main", f"JAT-AI: {request.integration_branch}", token,
+    )
+
+    cleanup_result = None
+    if request.cleanup:
+        cleanup_result = await cleanup_branches(
+            request.repo_owner, request.repo_name, request.branches, token
+        )
+
+    return {
+        "merge_results": merge_results,
+        "review": review_result,
+        "pr_url": pr_url,
+        "cleanup": cleanup_result,
+    }

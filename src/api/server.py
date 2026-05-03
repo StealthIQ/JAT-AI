@@ -13,6 +13,7 @@ from api.jules_accounts import router as jules_router
 from api.chat import router as chat_router
 from api.repos import router as repos_router
 from api.execute import router as execute_router
+from api.conversations import router as conversations_router
 from clients.supabase import SupabaseClient
 from config import load_settings
 
@@ -44,6 +45,7 @@ app.include_router(jules_router)
 app.include_router(chat_router)
 app.include_router(repos_router)
 app.include_router(execute_router)
+app.include_router(conversations_router)
 
 
 class PromptCreate(BaseModel):

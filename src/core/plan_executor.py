@@ -100,7 +100,28 @@ async def create_jules_session(prompt: str, owner: str, repo: str, branch: str, 
     return None
 
 
-async def poll_session_status(session_id: str, jules_key: str, timeout_minutes: int = 20) -> dict:
+async def send_message_to_session(session_id: str, message: str, jules_key: str) -> bool:
+    url = f"https://jules.googleapis.com/v1alpha/sessions/{session_id}:sendMessage"
+    headers = {"X-Goog-Api-Key": jules_key, "Content-Type": "application/json"}
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        res = await client.post(url, json={"message": message}, headers=headers)
+    return res.status_code == 200
+
+
+async def _answer_jules_question(session_data: dict, task_context: str, ai_key: str, ai_provider: str, ai_model: str) -> str:
+    from api.chat import _call_provider
+    question = session_data.get("lastMessage", {}).get("content", "Unknown question")
+    prompt = f"Jules is asking: {question}\n\nContext from planning phase:\n{task_context}\n\nAnswer concisely."
+    try:
+        return await _call_provider(ai_key, ai_provider, ai_model, [{"role": "user", "content": prompt}], "")
+    except Exception:
+        return "Please proceed with your best judgment based on the task description."
+
+
+async def poll_session_status(
+    session_id: str, jules_key: str, timeout_minutes: int = 20,
+    task_context: str = "", ai_key: str = "", ai_provider: str = "", ai_model: str = ""
+) -> dict:
     url = f"https://jules.googleapis.com/v1alpha/sessions/{session_id}"
     headers = {"X-Goog-Api-Key": jules_key}
     deadline = asyncio.get_event_loop().time() + (timeout_minutes * 60)
@@ -115,6 +136,9 @@ async def poll_session_status(session_id: str, jules_key: str, timeout_minutes: 
         state = data.get("state", "")
         if state in ("COMPLETED", "FAILED"):
             return data
+        if state == "AWAITING_USER_INPUT" and ai_key:
+            answer = await _answer_jules_question(data, task_context, ai_key, ai_provider, ai_model)
+            await send_message_to_session(session_id, answer, jules_key)
         await asyncio.sleep(15)
 
     return {"state": "TIMEOUT", "session_id": session_id}

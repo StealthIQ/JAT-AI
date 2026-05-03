@@ -23,6 +23,14 @@ class ChatRequest(BaseModel):
     system: str = ""
     image_base64: str | None = None
     repo: str | None = None
+    mode: str = "ask"
+
+
+MODE_SYSTEM_PROMPTS = {
+    "ask": "You are answering questions about a codebase. Be precise and reference specific files/functions. Do not suggest changes unless explicitly asked.",
+    "plan": "You are a technical project planner. Help the user break down their goal into discrete tasks. For each task, specify: description, dependencies, exit criteria. When the plan is complete, output it as JSON with a 'tasks' array. Each task has: id, description, dependencies (list of task ids), exit_criteria, branch (suggested branch name like jat/agent-1-description).",
+    "build": "You are a hands-on development assistant. Work through one task at a time with the user. Propose what to do, wait for approval, then confirm execution. After each step, ask what to do next.",
+}
 
 
 class ChatResponse(BaseModel):
@@ -173,6 +181,7 @@ async def chat_send(request: ChatRequest):
         raise HTTPException(400, f"No enabled keys for provider: {request.provider_type}")
 
     messages = _build_messages(request)
+    system = request.system or MODE_SYSTEM_PROMPTS.get(request.mode, "")
     last_error = ""
 
     for key_row in keys:
@@ -184,7 +193,7 @@ async def chat_send(request: ChatRequest):
                 provider_type=request.provider_type,
                 model=request.model,
                 messages=messages,
-                system=request.system,
+                system=system,
             )
             return ChatResponse(
                 response=response,

@@ -166,6 +166,7 @@ export const ChatPrimaryView = () => {
         messages: history,
         image_base64: imagePreview ?? undefined,
         repo: selectedRepo ? `iceyxsm/${selectedRepo}` : undefined,
+        mode,
       }),
     })
       .then((r) => r.json())

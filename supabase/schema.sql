@@ -133,8 +133,8 @@ create table if not exists conversations (
     title text not null default 'New Conversation',
     provider_id uuid references ai_providers(id) on delete set null,
     model text not null default '',
-    mode text not null default 'plan'
-        check (mode in ('plan', 'direct')),
+    mode text not null default 'ask'
+        check (mode in ('ask', 'plan', 'build')),
     repo_owner text not null default '',
     repo_name text not null default '',
     template text not null default '',
