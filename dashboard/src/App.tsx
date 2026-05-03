@@ -1,4 +1,4 @@
-import { type ReactNode, useCallback, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
 import { useBackendLivenessPolling } from "./app/hooks/useBackendLivenessPolling";
 import { OCTOBOSS_ID } from "./app/hooks/useCanvasGraphData";
@@ -7,6 +7,7 @@ import { useCodexUsagePolling } from "./app/hooks/useCodexUsagePolling";
 import { useConsoleKeyboardShortcuts } from "./app/hooks/useConsoleKeyboardShortcuts";
 import { useGitHubPrimaryViewModel } from "./app/hooks/useGitHubPrimaryViewModel";
 import { useGithubSummaryPolling } from "./app/hooks/useGithubSummaryPolling";
+import { useLiveTaskStatus } from "./app/hooks/useLiveTaskStatus";
 import { useMonitorRuntime } from "./app/hooks/useMonitorRuntime";
 import { usePersistedUiState } from "./app/hooks/usePersistedUiState";
 import { useTentacleGitLifecycle } from "./app/hooks/useTentacleGitLifecycle";
@@ -19,6 +20,7 @@ import { PrimaryViewRouter } from "./components/PrimaryViewRouter";
 import { RuntimeStatusStrip } from "./components/RuntimeStatusStrip";
 import { SidebarActionPanel } from "./components/SidebarActionPanel";
 import { TelemetryTape } from "./components/TelemetryTape";
+import { ToastNotification, type Toast } from "./components/ToastNotification";
 
 const EMPTY_COLUMNS: never[] = [];
 
@@ -30,6 +32,29 @@ export const App = () => {
   const [conversationsSidebarContent, setConversationsSidebarContent] = useState<ReactNode>(null);
   const [conversationsActionPanel, setConversationsActionPanel] = useState<ReactNode>(null);
   const [promptsSidebarContent, setPromptsSidebarContent] = useState<ReactNode>(null);
+  const [toasts, setToasts] = useState<Toast[]>([]);
+
+  const liveTasks = useLiveTaskStatus();
+  const prevTaskStatusRef = useRef<Record<string, string>>({});
+
+  useEffect(() => {
+    const prev = prevTaskStatusRef.current;
+    for (const task of liveTasks) {
+      const oldStatus = prev[task.id];
+      if (oldStatus && oldStatus !== task.status) {
+        if (task.status === "completed") {
+          setToasts((t) => [...t, { id: `t-${Date.now()}-${task.id}`, message: `Task completed: ${task.repo_name}`, type: "success" }]);
+        } else if (task.status === "failed") {
+          setToasts((t) => [...t, { id: `t-${Date.now()}-${task.id}`, message: `Task failed: ${task.repo_name}`, type: "error" }]);
+        }
+      }
+    }
+    prevTaskStatusRef.current = Object.fromEntries(liveTasks.map((t) => [t.id, t.status]));
+  }, [liveTasks]);
+
+  const dismissToast = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
 
   const {
     activePrimaryNav,
@@ -405,6 +430,8 @@ export const App = () => {
       {isUiStateHydrated && isMonitorVisible && isBottomTelemetryVisible && (
         <TelemetryTape monitorFeed={monitorRuntime.monitorFeed} />
       )}
+
+      <ToastNotification toasts={toasts} onDismiss={dismissToast} />
     </div>
   );
 };

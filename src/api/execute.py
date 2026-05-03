@@ -17,6 +17,7 @@ from core.plan_executor import (
     ExecutionPlan,
     AgentTask,
 )
+from core.session_limiter import get_session_limiter
 
 router = APIRouter()
 settings = load_settings()
@@ -68,50 +69,54 @@ async def _update_jdocs(plan: ExecutionPlan, task: AgentTask, status: str, sessi
     )
 
 
-async def _run_task_once(task: AgentTask, plan: ExecutionPlan, base_sha: str, jules_key: str, token: str) -> TaskResult:
-    await _track_task(task, plan, "running")
-    branch_created = await create_branch_from_ref(
-        plan.repo_owner, plan.repo_name, task.branch_name, base_sha, token
-    )
-    if not branch_created:
-        return TaskResult(task_id=task.id, status="failed", error="Branch creation failed")
-
-    prompt = await _resolve_prompt(task)
-
-    session_id = await create_jules_session(
-        prompt=prompt,
-        owner=plan.repo_owner,
-        repo=plan.repo_name,
-        branch=task.branch_name,
-        jules_key=jules_key,
-    )
-    if not session_id:
-        return TaskResult(task_id=task.id, status="failed", error="Session creation failed")
-
-    result = await poll_session_status(session_id, jules_key, plan.timeout_minutes)
-    state = result.get("state", "UNKNOWN")
-
-    if state == "TIMEOUT":
-        return TaskResult(task_id=task.id, status="failed", session_id=session_id, error=f"Session timed out after {plan.timeout_minutes}min (still running on Jules)")
-
-    pr_url = None
-    outputs = result.get("outputs", [])
+def _extract_pr_url(outputs: list[dict]) -> str | None:
     for out in outputs:
         if "pull_request" in out:
-            pr_url = out["pull_request"].get("url", "")
-            break
+            return out["pull_request"].get("url", "")
+    return None
 
-    status = "completed" if state == "COMPLETED" else "failed"
-    await _track_task(task, plan, status, session_id)
-    await _update_jdocs(plan, task, status, session_id or "", pr_url, token)
 
-    return TaskResult(
-        task_id=task.id,
-        status=status,
-        session_id=session_id,
-        pr_url=pr_url,
-        error=None if state == "COMPLETED" else f"Session ended with state: {state}",
-    )
+async def _run_task_once(task: AgentTask, plan: ExecutionPlan, base_sha: str, jules_key: str, token: str) -> TaskResult:
+    limiter = get_session_limiter()
+    pipeline_id = f"{plan.repo_owner}/{plan.repo_name}"
+
+    acquired = await limiter.acquire(pipeline_id, plan.repo_name, task.id)
+    if not acquired:
+        return TaskResult(task_id=task.id, status="failed", error="Could not acquire session slot (global limit reached)")
+
+    try:
+        await _track_task(task, plan, "running")
+        branch_created = await create_branch_from_ref(
+            plan.repo_owner, plan.repo_name, task.branch_name, base_sha, token
+        )
+        if not branch_created:
+            return TaskResult(task_id=task.id, status="failed", error="Branch creation failed")
+
+        prompt = await _resolve_prompt(task)
+        session_id = await create_jules_session(
+            prompt=prompt, owner=plan.repo_owner, repo=plan.repo_name,
+            branch=task.branch_name, jules_key=jules_key,
+        )
+        if not session_id:
+            return TaskResult(task_id=task.id, status="failed", error="Session creation failed")
+
+        result = await poll_session_status(session_id, jules_key, plan.timeout_minutes)
+        state = result.get("state", "UNKNOWN")
+
+        if state == "TIMEOUT":
+            return TaskResult(task_id=task.id, status="failed", session_id=session_id, error=f"Session timed out after {plan.timeout_minutes}min (still running on Jules)")
+
+        pr_url = _extract_pr_url(result.get("outputs", []))
+        status = "completed" if state == "COMPLETED" else "failed"
+        await _track_task(task, plan, status, session_id)
+        await _update_jdocs(plan, task, status, session_id or "", pr_url, token)
+
+        return TaskResult(
+            task_id=task.id, status=status, session_id=session_id, pr_url=pr_url,
+            error=None if state == "COMPLETED" else f"Session ended with state: {state}",
+        )
+    finally:
+        await limiter.release(task.id)
 
 
 async def _resolve_prompt(task: AgentTask) -> str:
@@ -230,6 +235,12 @@ async def execute_plan(request: ExecuteRequest):
         status="completed" if all_done else "partial",
         results=results,
     )
+
+
+@router.get("/api/session-limiter/status")
+async def limiter_status():
+    limiter = get_session_limiter()
+    return limiter.status()
 
 
 class MergeReviewRequest(BaseModel):

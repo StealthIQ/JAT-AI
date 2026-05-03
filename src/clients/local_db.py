@@ -38,6 +38,16 @@ class LocalDB:
                 max_daily_tasks INTEGER DEFAULT 300,
                 created_at TEXT DEFAULT (datetime('now'))
             );
+            CREATE TABLE IF NOT EXISTS account_sources (
+                id TEXT PRIMARY KEY,
+                account_id TEXT NOT NULL,
+                source_name TEXT NOT NULL,
+                repo_owner TEXT NOT NULL,
+                repo_name TEXT NOT NULL,
+                created_at TEXT DEFAULT (datetime('now')),
+                FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
+                UNIQUE (account_id, source_name)
+            );
             CREATE TABLE IF NOT EXISTS agent_tasks (
                 id TEXT PRIMARY KEY,
                 workflow_id TEXT,

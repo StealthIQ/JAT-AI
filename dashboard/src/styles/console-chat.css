@@ -495,3 +495,41 @@
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+.chat-body-row {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.chat-body-row .chat-messages {
+  flex: 1;
+  min-width: 0;
+}
+
+.chat-approve-btn {
+  padding: 0.3rem 0.7rem;
+  background: #25d366;
+  border: none;
+  color: #0a0c0f;
+  font-family: var(--font-main);
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+.chat-approve-btn:hover {
+  background: #1fb855;
+}
+
+.chat-exec-status {
+  font-size: 0.65rem;
+  color: #00e5ff;
+  white-space: nowrap;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

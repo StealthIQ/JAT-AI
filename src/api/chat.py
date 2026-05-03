@@ -164,6 +164,17 @@ def _is_repomix_trigger(messages: list) -> bool:
     return content.strip().lower() in REPOMIX_TRIGGERS
 
 
+async def _inject_available_skills(system: str) -> str:
+    try:
+        rows = await db.select("prompts")
+        if not rows:
+            return system
+        skills_list = "\n".join(f"- {r['name']}: {r.get('content', '')[:80]}" for r in rows[:20])
+        return system + f"\n\n<available_skills>\nAssign these via prompt_id in your plan. The orchestrator will inject the full prompt content into each Jules session.\n{skills_list}\n</available_skills>"
+    except Exception:
+        return system
+
+
 @router.post("/api/chat/send")
 async def chat_send(request: ChatRequest):
     if _is_repomix_trigger(request.messages) and request.repo:
@@ -184,6 +195,11 @@ async def chat_send(request: ChatRequest):
 
     messages = _build_messages(request)
     system = request.system or MODE_SYSTEM_PROMPTS.get(request.mode, "")
+
+    # In plan/auto mode, inject available skills so the AI can assign them to tasks
+    if request.mode in ("plan", "auto") and not request.system:
+        system = await _inject_available_skills(system)
+
     last_error = ""
 
     for key_row in keys:
