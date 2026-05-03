@@ -213,6 +213,19 @@ async def execute_plan(request: ExecuteRequest):
         results = await _execute_sequential(plan, jules_key, token)
 
     all_done = all(r.status == "completed" for r in results)
+
+    merge_result = None
+    if all_done:
+        from core.merge_review import merge_branches, create_integration_branch, run_review_session, create_final_pr
+        base_sha = await get_default_branch_sha(request.repo_owner, request.repo_name, token)
+        if base_sha:
+            branches = [t.branch_name for t in plan.tasks]
+            integration = f"jat/integration-{request.repo_name}"
+            await create_integration_branch(request.repo_owner, request.repo_name, base_sha, integration, token)
+            merge_result = await merge_branches(request.repo_owner, request.repo_name, branches, integration, token)
+            pr_url = await create_final_pr(request.repo_owner, request.repo_name, integration, "main", f"JAT-AI: {integration}", token)
+            merge_result["pr_url"] = pr_url
+
     return ExecuteResponse(
         status="completed" if all_done else "partial",
         results=results,

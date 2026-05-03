@@ -25,10 +25,13 @@ class ChatRequest(BaseModel):
     mode: str = "ask"
 
 
+from prompts.system_prompts import ASK_MODE_SYSTEM, PLAN_MODE_SYSTEM, BUILD_MODE_SYSTEM, AUTO_MODE_SYSTEM
+
 MODE_SYSTEM_PROMPTS = {
-    "ask": "You are answering questions about a codebase. Be precise and reference specific files/functions. Do not suggest changes unless explicitly asked.",
-    "plan": "You are a technical project planner. Help the user break down their goal into discrete tasks. For each task, specify: description, dependencies, exit criteria. When the plan is complete, output it as JSON with a 'tasks' array. Each task has: id, description, dependencies (list of task ids), exit_criteria, branch (suggested branch name like jat/agent-1-description).",
-    "build": "You are a hands-on development assistant. Work through one task at a time with the user. Propose what to do, wait for approval, then confirm execution. After each step, ask what to do next.",
+    "ask": ASK_MODE_SYSTEM,
+    "plan": PLAN_MODE_SYSTEM,
+    "build": BUILD_MODE_SYSTEM,
+    "auto": AUTO_MODE_SYSTEM,
 }
 
 
