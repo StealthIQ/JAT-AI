@@ -212,8 +212,21 @@ export const ChatPrimaryView = () => {
   const hasExistingMessages = (activeConv?.messages.length ?? 0) > 0;
   const chatEnabled = isStarted || hasExistingMessages;
 
+  const hasProviders = providerTypes.length > 0;
+
   return (
-    <section className="chat-view" aria-label="Chat primary view">
+    <section className="chat-view" aria-label="Chat primary view" style={{ position: "relative" }}>
+      {!hasProviders && (
+        <div className="apis-setup-overlay">
+          <div className="apis-setup-card">
+            <h3>AI Provider Key Required</h3>
+            <p>Add at least one AI provider API key to start chatting. Free options include Groq, Google AI Studio, and NVIDIA NIM.</p>
+            <button type="button" className="apis-setup-btn" onClick={() => { window.dispatchEvent(new CustomEvent("navigate", { detail: 6 })); }}>
+              Go to APIs
+            </button>
+          </div>
+        </div>
+      )}
       <aside className="chat-sidebar">
         <div className="chat-sidebar-toolbar">
           <button type="button" className="chat-new-btn" onClick={handleNewConversation}>+ New Chat</button>

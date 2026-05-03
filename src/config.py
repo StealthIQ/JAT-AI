@@ -23,11 +23,13 @@ class Settings(BaseSettings):
     supabase_url: str = ""
     supabase_key: str = ""
     encryption_key: str = ""
+    ollama_url: str = "http://localhost:11434"
+    ollama_model: str = "qwen2.5:14b"
     default_repo_owner: str = ""
     default_repo_name: str = ""
     log_level: str = "INFO"
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
 
 def load_settings() -> Settings:
