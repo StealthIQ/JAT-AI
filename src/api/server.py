@@ -14,6 +14,7 @@ from api.chat import router as chat_router
 from api.repos import router as repos_router
 from api.execute import router as execute_router
 from api.conversations import router as conversations_router
+from api.settings import router as settings_router
 from config import load_settings
 from db import db
 
@@ -45,6 +46,7 @@ app.include_router(chat_router)
 app.include_router(repos_router)
 app.include_router(execute_router)
 app.include_router(conversations_router)
+app.include_router(settings_router)
 
 
 class PromptCreate(BaseModel):
@@ -59,8 +61,8 @@ class PromptUpdate(BaseModel):
 
 @app.get("/api/prompts")
 async def list_prompts():
-    rows = await db.select("prompts", columns="name, source, format")
-    return {"prompts": rows}
+    rows = await db.select("prompts")
+    return {"prompts": [{"name": r["name"], "source": r.get("source", "user")} for r in rows]}
 
 
 @app.get("/api/prompts/{name}")
@@ -196,19 +198,21 @@ async def list_conversations():
 async def get_usage():
     accounts = await db.select("accounts")
     total_daily = sum(a.get("max_daily_tasks", 0) for a in accounts)
+    sessions_today = sum(a.get("sessions_today", 0) for a in accounts)
     active_count = len([a for a in accounts if a.get("enabled")])
+    pct = int((sessions_today / total_daily) * 100) if total_daily > 0 else 0
     return {
         "status": "ok",
         "fetchedAt": "connected" if settings.supabase_url else "disconnected",
         "source": "cli-pty",
-        "planType": "ultra",
-        "primaryUsedPercent": 0,
+        "planType": "ultra" if total_daily >= 300 else ("pro" if total_daily >= 100 else "free"),
+        "primaryUsedPercent": pct,
         "primaryResetAt": None,
-        "secondaryUsedPercent": 0,
+        "secondaryUsedPercent": active_count,
         "secondaryResetAt": None,
-        "extraUsageCostUsed": 0,
-        "extraUsageCostLimit": total_daily or 300,
-        "message": f"0/{total_daily or 300} daily sessions | {active_count} accounts",
+        "extraUsageCostUsed": sessions_today,
+        "extraUsageCostLimit": total_daily,
+        "message": f"{sessions_today}/{total_daily} daily sessions | {active_count} account{'s' if active_count != 1 else ''}",
     }
 
 

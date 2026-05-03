@@ -26,6 +26,9 @@ export const SidebarPromptsList = ({
   onCloseTerminal,
 }: SidebarPromptsListProps) => {
   const [search, setSearch] = useState("");
+  const [skillsOpen, setSkillsOpen] = useState(true);
+  const [customOpen, setCustomOpen] = useState(true);
+
   const filtered = useMemo(() => {
     if (!search.trim()) return prompts;
     const q = search.toLowerCase();
@@ -40,24 +43,12 @@ export const SidebarPromptsList = ({
         <button type="button" className="sidebar-prompts-new-btn" onClick={onNewPrompt}>
           + New Prompt
         </button>
-        <button
-          type="button"
-          className="sidebar-prompts-refresh-btn"
-          onClick={onRefresh}
-          disabled={isLoadingPrompts}
-          aria-label="Refresh prompts"
-        >
+        <button type="button" className="sidebar-prompts-refresh-btn" onClick={onRefresh} disabled={isLoadingPrompts} aria-label="Refresh prompts">
           R
         </button>
       </div>
 
-      <input
-        className="sidebar-prompts-search"
-        type="text"
-        placeholder="Search prompts..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-      />
+      <input className="sidebar-prompts-search" type="text" placeholder="Search prompts..." value={search} onChange={(e) => setSearch(e.target.value)} />
 
       {isLoadingPrompts && prompts.length === 0 ? (
         <p className="sidebar-prompts-empty">Loading...</p>
@@ -65,39 +56,29 @@ export const SidebarPromptsList = ({
         <p className="sidebar-prompts-empty">{search ? "No matches" : "No prompts yet"}</p>
       ) : (
         <div className="sidebar-prompts-list">
-          {userPrompts.length > 0 && (
+          {builtinPrompts.length > 0 && (
             <div className="sidebar-prompts-group">
-              <h4 className="sidebar-prompts-group-label">My Prompts</h4>
-              {userPrompts.map((p) => (
-                <button
-                  key={p.name}
-                  type="button"
-                  className="sidebar-prompts-item"
-                  data-active={selectedPromptName === p.name ? "true" : undefined}
-                  onClick={() => {
-                    onSelectPrompt(p.name);
-                  }}
-                >
-                  {p.name}.md
+              <button type="button" className="sidebar-prompts-group-toggle" onClick={() => setSkillsOpen((o) => !o)}>
+                <span className={`sidebar-prompts-arrow${skillsOpen ? " is-open" : ""}`}>▶</span>
+                Skills ({builtinPrompts.length})
+              </button>
+              {skillsOpen && builtinPrompts.map((p) => (
+                <button key={p.name} type="button" className="sidebar-prompts-item" data-active={selectedPromptName === p.name ? "true" : undefined} onClick={() => onSelectPrompt(p.name)}>
+                  {p.name}
                 </button>
               ))}
             </div>
           )}
 
-          {builtinPrompts.length > 0 && (
+          {userPrompts.length > 0 && (
             <div className="sidebar-prompts-group">
-              <h4 className="sidebar-prompts-group-label">Built-in</h4>
-              {builtinPrompts.map((p) => (
-                <button
-                  key={p.name}
-                  type="button"
-                  className="sidebar-prompts-item"
-                  data-active={selectedPromptName === p.name ? "true" : undefined}
-                  onClick={() => {
-                    onSelectPrompt(p.name);
-                  }}
-                >
-                  {p.name}.md
+              <button type="button" className="sidebar-prompts-group-toggle" onClick={() => setCustomOpen((o) => !o)}>
+                <span className={`sidebar-prompts-arrow${customOpen ? " is-open" : ""}`}>▶</span>
+                Custom Prompts ({userPrompts.length})
+              </button>
+              {customOpen && userPrompts.map((p) => (
+                <button key={p.name} type="button" className="sidebar-prompts-item" data-active={selectedPromptName === p.name ? "true" : undefined} onClick={() => onSelectPrompt(p.name)}>
+                  {p.name}
                 </button>
               ))}
             </div>
@@ -107,22 +88,11 @@ export const SidebarPromptsList = ({
 
       {activeTerminalId && (
         <div className="sidebar-prompts-minimized-terminal">
-          <button
-            type="button"
-            className="sidebar-prompts-minimized-terminal-restore"
-            onClick={onRestoreTerminal}
-          >
+          <button type="button" className="sidebar-prompts-minimized-terminal-restore" onClick={onRestoreTerminal}>
             <span className="sidebar-prompts-minimized-terminal-icon">{">_"}</span>
             <span className="sidebar-prompts-minimized-terminal-label">Prompt Engineer</span>
           </button>
-          <button
-            type="button"
-            className="sidebar-prompts-minimized-terminal-close"
-            onClick={onCloseTerminal}
-            aria-label="Close terminal"
-          >
-            ✕
-          </button>
+          <button type="button" className="sidebar-prompts-minimized-terminal-close" onClick={onCloseTerminal} aria-label="Close terminal">x</button>
         </div>
       )}
     </div>

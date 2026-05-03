@@ -29,6 +29,13 @@ export const JulesPrimaryView = () => {
 
   useEffect(() => { fetchAccounts(); }, [fetchAccounts]);
 
+  const getNextName = () => {
+    const existing = accounts.map((a) => a.name);
+    let n = 1;
+    while (existing.includes(`JULES_API_${n}`)) n++;
+    return `JULES_API_${n}`;
+  };
+
   const handleAdd = useCallback(() => {
     if (!formName.trim() || !formKey.trim()) return;
     fetch("/api/jules/accounts", {
@@ -65,7 +72,7 @@ export const JulesPrimaryView = () => {
       <div className="jules-content">
         <header className="jules-header">
           <h2 className="jules-title">Jules Accounts</h2>
-          <button type="button" className="jules-add-btn" onClick={() => setShowAddPopup(true)}>+ Add Account</button>
+          <button type="button" className="jules-add-btn" onClick={() => { setFormName(getNextName()); setShowAddPopup(true); }}>+ Add Account</button>
         </header>
         {successMsg && <div className="jules-success">{successMsg}</div>}
         <div className="jules-list">

@@ -19,12 +19,6 @@ class LocalDB:
             self._init_tables()
         return self._conn
 
-    def _init_tables(self) -> None:
-        conn = self._conn
-        assert conn is not None
-        conn.executescript(self._schema())
-        conn.commit()
-
     def _schema(self) -> str:
         return """
             CREATE TABLE IF NOT EXISTS accounts (
@@ -134,7 +128,29 @@ class LocalDB:
                 FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
             );
         """
+
+    def _seed_prompts(self) -> None:
+        conn = self._get_conn()
+        seeds = [
+            ("security-audit", "Perform a security audit following OWASP Top 10", "builtin"),
+            ("add-tests", "Add comprehensive test coverage", "builtin"),
+            ("code-review", "Review code for correctness, performance, and security", "builtin"),
+            ("new-project", "Scaffold a new project with best practices", "builtin"),
+            ("fix-issues", "Diagnose and fix reported issues", "builtin"),
+        ]
+        for name, content, source in seeds:
+            conn.execute(
+                "INSERT OR IGNORE INTO prompts (id, name, content, source) VALUES (?, ?, ?, ?)",
+                (str(uuid.uuid4()), name, content, source),
+            )
         conn.commit()
+
+    def _init_tables(self) -> None:
+        conn = self._conn
+        assert conn is not None
+        conn.executescript(self._schema())
+        conn.commit()
+        self._seed_prompts()
 
     async def select(self, table: str, filters: dict[str, Any] | None = None, columns: str | None = None) -> list[dict]:
         conn = self._get_conn()

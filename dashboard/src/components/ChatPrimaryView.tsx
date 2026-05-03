@@ -43,6 +43,7 @@ export const ChatPrimaryView = () => {
   const [isStarted, setIsStarted] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [usage, setUsage] = useState({ tokensUsed: 0, tokensLimit: 0, rpmLimit: 40, requestsToday: 0 });
+  const [chatSearch, setChatSearch] = useState("");
 
   const tasks = useLiveTaskStatus();
   const activeConv = conversations.find((c) => c.id === activeConvId) ?? null;
@@ -52,7 +53,7 @@ export const ChatPrimaryView = () => {
     selectedProviderType, selectedModel, setConversations, setMode,
   );
 
-  useEffect(() => {
+  const fetchConversations = useCallback(() => {
     fetch("/api/conversations").then((r) => r.json()).then((d) => {
       const convs = (d.conversations ?? []).map((c: any) => ({
         id: c.id, title: c.title || "Untitled", messages: [], createdAt: c.created_at, model: c.model,
@@ -60,6 +61,8 @@ export const ChatPrimaryView = () => {
       if (convs.length > 0) { setConversations(convs); setActiveConvId(convs[0].id); }
     }).catch(() => {});
   }, []);
+
+  useEffect(() => { fetchConversations(); }, [fetchConversations]);
 
   useEffect(() => {
     fetch("/api/providers").then((r) => r.json()).then((d) => {
@@ -206,13 +209,19 @@ export const ChatPrimaryView = () => {
   const modelItems = models.map((m) => ({ id: m.id, label: m.name }));
   const repoItems = repos.map((r) => ({ id: r, label: r }));
   const showTasks = (mode === "plan" || mode === "build" || mode === "auto") && tasks.length > 0;
+  const hasExistingMessages = (activeConv?.messages.length ?? 0) > 0;
+  const chatEnabled = isStarted || hasExistingMessages;
 
   return (
     <section className="chat-view" aria-label="Chat primary view">
       <aside className="chat-sidebar">
-        <button type="button" className="chat-new-btn" onClick={handleNewConversation}>+ New Chat</button>
+        <div className="chat-sidebar-toolbar">
+          <button type="button" className="chat-new-btn" onClick={handleNewConversation}>+ New Chat</button>
+          <button type="button" className="chat-refresh-btn" onClick={fetchConversations} aria-label="Refresh chats">R</button>
+        </div>
+        <input className="chat-search" type="text" placeholder="Search chats..." value={chatSearch} onChange={(e) => setChatSearch(e.target.value)} />
         <div className="chat-conv-list">
-          {conversations.map((c) => (
+          {conversations.filter((c) => c.title.toLowerCase().includes(chatSearch.toLowerCase())).map((c) => (
             <button key={c.id} type="button" className={`chat-conv-item${activeConvId === c.id ? " is-active" : ""}`} onClick={() => setActiveConvId(c.id)}>
               <span className="chat-conv-title">{c.title}</span>
               <span className="chat-conv-meta">{c.model ?? "no model"}</span>
@@ -261,6 +270,17 @@ export const ChatPrimaryView = () => {
             </header>
             <div className="chat-body-row">
               <div className="chat-messages">
+                {isAnalyzing && (
+                  <div className="chat-setup-overlay">
+                    <div className="chat-setup-spinner" />
+                    <span className="chat-setup-text">Setting up — analyzing repository...</span>
+                  </div>
+                )}
+                {!chatEnabled && !isAnalyzing && activeConv.messages.length === 0 && (
+                  <div className="chat-setup-overlay">
+                    <span className="chat-setup-text">Select a repo and click Start to begin</span>
+                  </div>
+                )}
                 {activeConv.messages.map((msg) => (
                   <div key={msg.id} className={`chat-msg chat-msg--${msg.role}`}>
                     <span className="chat-msg-role">{msg.role === "user" ? "You" : msg.model ?? "AI"}</span>
@@ -277,7 +297,7 @@ export const ChatPrimaryView = () => {
               </div>
               <TaskListPanel tasks={tasks} visible={showTasks} />
             </div>
-            <div className="chat-input-bar">
+            <div className={`chat-input-bar${!chatEnabled ? " chat-input-bar--disabled" : ""}`}>
               <input ref={imageInputRef} type="file" accept="image/*" className="chat-image-input-hidden" onChange={handleImageChange} />
               <button type="button" className="chat-image-btn" onClick={() => imageInputRef.current?.click()} title="Attach image">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -292,8 +312,8 @@ export const ChatPrimaryView = () => {
                   <button type="button" className="chat-image-remove" onClick={() => setImagePreview(null)}>x</button>
                 </div>
               )}
-              <input className="chat-input" type="text" placeholder="Type a message..." value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleSend(); }} />
-              <button type="button" className="chat-send-btn" onClick={handleSend} disabled={!input.trim() || isTyping}>Send</button>
+              <input className="chat-input" type="text" placeholder={chatEnabled ? "Type a message..." : "Click Start to begin"} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleSend(); }} disabled={!chatEnabled} />
+              <button type="button" className="chat-send-btn" onClick={handleSend} disabled={!input.trim() || isTyping || !chatEnabled}>Send</button>
             </div>
           </>
         ) : (

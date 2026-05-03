@@ -10,11 +10,10 @@ export const PRIMARY_NAV_ITEMS = [
   { index: 1, label: "Agents" },
   { index: 2, label: "Repos" },
   { index: 3, label: "Activity" },
-  { index: 5, label: "Jules" },
-  { index: 6, label: "Chat" },
-  { index: 7, label: "Prompts" },
-  { index: 8, label: "Settings" },
-  { index: 9, label: "APIs" },
+  { index: 4, label: "Chat" },
+  { index: 5, label: "Prompts" },
+  { index: 6, label: "APIs" },
+  { index: 7, label: "Settings" },
 ] as const;
 
 export const GITHUB_COMMIT_SERIES_LENGTH = 30;

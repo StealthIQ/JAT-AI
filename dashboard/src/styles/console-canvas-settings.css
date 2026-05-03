@@ -205,3 +205,281 @@
     grid-template-columns: 1fr;
   }
 }
+
+.settings-db-modes {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.settings-db-btn {
+  padding: 0.35rem 0.7rem;
+  background: #11161d;
+  border: 1px solid #2b2f36;
+  color: #9eb0c8;
+  font-family: var(--font-main);
+  font-size: 0.75rem;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+}
+
+.settings-db-btn--active {
+  border-color: #00e5ff;
+  background: color-mix(in srgb, #00e5ff 12%, #11161d);
+  color: #00e5ff;
+}
+
+.settings-db-btn:hover:not(.settings-db-btn--active) {
+  border-color: #3a4555;
+}
+
+.settings-db-desc {
+  margin: 0;
+  font-size: 0.72rem;
+  color: #6b7a90;
+}
+
+.settings-fields {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.settings-field {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.settings-field-label {
+  font-size: 0.72rem;
+  color: #9eb0c8;
+  letter-spacing: 0.03em;
+}
+
+.settings-field-input {
+  padding: 0.4rem 0.5rem;
+  background: #0c141f;
+  border: 1px solid #2b2f36;
+  color: #e6e8ec;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.75rem;
+  outline: none;
+}
+
+.settings-field-input:focus {
+  border-color: #00e5ff;
+}
+
+.settings-field-input:disabled {
+  opacity: 0.5;
+}
+
+.settings-save-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.settings-save-btn {
+  padding: 0.4rem 1rem;
+  background: #00e5ff;
+  border: none;
+  color: #0a0c0f;
+  font-family: var(--font-main);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+.settings-save-btn:hover {
+  background: #00c4d9;
+}
+
+.settings-save-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.settings-encryption-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.settings-encryption-status {
+  font-size: 0.75rem;
+  color: #9eb0c8;
+  font-family: "JetBrains Mono", monospace;
+}
+
+.settings-regen-btn {
+  padding: 0.3rem 0.6rem;
+  background: #1a1f2e;
+  border: 1px solid #ef4444;
+  color: #ef4444;
+  font-family: var(--font-main);
+  font-size: 0.7rem;
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+.settings-regen-btn:hover {
+  background: color-mix(in srgb, #ef4444 12%, #1a1f2e);
+}
+
+.settings-popup-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.settings-popup {
+  background: #0b0d10;
+  border: 1px solid #2b2f36;
+  padding: 1.2rem;
+  max-width: 440px;
+  width: 90%;
+  display: grid;
+  gap: 0.8rem;
+}
+
+.settings-popup-title {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #ef4444;
+}
+
+.settings-popup-warning {
+  margin: 0;
+  font-size: 0.75rem;
+  color: #f59e0b;
+  line-height: 1.5;
+}
+
+.settings-popup-confirm-text {
+  margin: 0;
+  font-size: 0.72rem;
+  color: #9eb0c8;
+}
+
+.settings-popup-input {
+  padding: 0.4rem 0.5rem;
+  background: #0c141f;
+  border: 1px solid #2b2f36;
+  color: #e6e8ec;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.75rem;
+  outline: none;
+}
+
+.settings-popup-input:focus {
+  border-color: #ef4444;
+}
+
+.settings-popup-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.settings-popup-footer button {
+  padding: 0.35rem 0.7rem;
+  background: #1a1f2e;
+  border: 1px solid #2b2f36;
+  color: #9eb0c8;
+  font-family: var(--font-main);
+  font-size: 0.72rem;
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+.settings-popup-danger {
+  border-color: #ef4444 !important;
+  color: #ef4444 !important;
+}
+
+.settings-popup-danger:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.settings-popup-danger:not(:disabled):hover {
+  background: color-mix(in srgb, #ef4444 15%, #1a1f2e);
+}
+
+.settings-edit-btn {
+  padding: 0.3rem 0.7rem;
+  background: #11161d;
+  border: 1px solid #00e5ff;
+  color: #00e5ff;
+  font-family: var(--font-main);
+  font-size: 0.7rem;
+  cursor: pointer;
+  border-radius: 3px;
+  margin-left: auto;
+}
+
+.settings-edit-btn:hover {
+  background: color-mix(in srgb, #00e5ff 12%, #11161d);
+}
+
+.settings-cancel-btn {
+  padding: 0.4rem 1rem;
+  background: #11161d;
+  border: 1px solid #2b2f36;
+  color: #9eb0c8;
+  font-family: var(--font-main);
+  font-size: 0.75rem;
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+.settings-cancel-btn:hover {
+  border-color: #3a4555;
+}
+
+.settings-panel-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.settings-field-label-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.settings-status-badge {
+  font-size: 0.65rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  font-family: var(--font-main);
+  letter-spacing: 0.03em;
+  border: none;
+  cursor: default;
+}
+
+.settings-status-badge--active {
+  background: color-mix(in srgb, #25d366 20%, #11161d);
+  color: #25d366;
+}
+
+.settings-status-badge--error {
+  background: color-mix(in srgb, #ef4444 20%, #11161d);
+  color: #ef4444;
+  cursor: pointer;
+}
+
+.settings-status-badge--error:hover {
+  background: color-mix(in srgb, #ef4444 30%, #11161d);
+}
+
+.settings-status-badge--none {
+  background: #1a1f2e;
+  color: #6b7a90;
+}

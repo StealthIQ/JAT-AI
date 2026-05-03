@@ -6,7 +6,6 @@ import { ActivityPrimaryView } from "./ActivityPrimaryView";
 import { ApisPrimaryView } from "./ApisPrimaryView";
 import { CanvasPrimaryView } from "./CanvasPrimaryView";
 import { ChatPrimaryView } from "./ChatPrimaryView";
-import { JulesPrimaryView } from "./JulesPrimaryView";
 import { PromptsPrimaryView } from "./PromptsPrimaryView";
 import { ReposPrimaryView } from "./ReposPrimaryView";
 import { SettingsPrimaryView } from "./SettingsPrimaryView";
@@ -55,26 +54,22 @@ export const PrimaryViewRouter = ({
     return <ActivityPrimaryView {...activityPrimaryViewProps} />;
   }
 
-  if (activePrimaryNav === 5) {
-    return <JulesPrimaryView />;
-  }
-
-  if (activePrimaryNav === 6) {
+  if (activePrimaryNav === 4) {
     return <ChatPrimaryView />;
   }
 
-  if (activePrimaryNav === 7) {
+  if (activePrimaryNav === 5) {
     return (
       <PromptsPrimaryView enabled={promptsEnabled} onSidebarContent={onPromptsSidebarContent} />
     );
   }
 
-  if (activePrimaryNav === 8) {
-    return <SettingsPrimaryView {...settingsPrimaryViewProps} />;
+  if (activePrimaryNav === 6) {
+    return <ApisPrimaryView />;
   }
 
-  if (activePrimaryNav === 9) {
-    return <ApisPrimaryView />;
+  if (activePrimaryNav === 7) {
+    return <SettingsPrimaryView {...settingsPrimaryViewProps} />;
   }
 
   return <CanvasPrimaryView {...canvasPrimaryViewProps} />;

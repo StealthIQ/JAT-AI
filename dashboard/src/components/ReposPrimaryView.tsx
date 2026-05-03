@@ -31,6 +31,13 @@ const hashStr = (s: string): number => {
 export const ReposPrimaryView = () => {
   const [repos, setRepos] = useState<RepoCard[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasGithubKey, setHasGithubKey] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/settings").then((r) => r.json()).then((d) => {
+      setHasGithubKey(Boolean(d.github_token));
+    }).catch(() => {});
+  }, []);
 
   const fetchRepos = useCallback(async () => {
     setIsLoading(true);
@@ -63,7 +70,18 @@ export const ReposPrimaryView = () => {
   const totalTasks = repos.reduce((s, r) => s + r.tasks.length, 0);
 
   return (
-    <section className="repos-view" aria-label="Repos primary view">
+    <section className="repos-view" aria-label="Repos primary view" style={{ position: "relative" }}>
+      {!hasGithubKey && (
+        <div className="apis-setup-overlay">
+          <div className="apis-setup-card">
+            <h3>GitHub API Key Required</h3>
+            <p>Configure your GitHub token in Settings to view connected repos and tasks.</p>
+            <button type="button" className="apis-setup-btn" onClick={() => { window.dispatchEvent(new CustomEvent("navigate", { detail: 7 })); }}>
+              Go to Settings
+            </button>
+          </div>
+        </div>
+      )}
       <header className="repos-header">
         <h2>Repos</h2>
         <span className="repos-summary">

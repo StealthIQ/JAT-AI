@@ -246,17 +246,15 @@ export const App = () => {
 
       <section className="console-main-canvas" aria-label="Main content canvas">
         <div
-          className={`workspace-shell${isAgentsSidebarVisible && activePrimaryNav !== 1 && activePrimaryNav !== 2 && activePrimaryNav !== 3 && activePrimaryNav !== 4 && activePrimaryNav !== 5 && activePrimaryNav !== 6 && activePrimaryNav !== 8 && activePrimaryNav !== 9 ? "" : " workspace-shell--full"}`}
+          className={`workspace-shell${isAgentsSidebarVisible && activePrimaryNav !== 1 && activePrimaryNav !== 2 && activePrimaryNav !== 3 && activePrimaryNav !== 4 && activePrimaryNav !== 6 && activePrimaryNav !== 7 ? "" : " workspace-shell--full"}`}
         >
           {isAgentsSidebarVisible &&
             activePrimaryNav !== 1 &&
             activePrimaryNav !== 2 &&
             activePrimaryNav !== 3 &&
             activePrimaryNav !== 4 &&
-            activePrimaryNav !== 5 &&
             activePrimaryNav !== 6 &&
-            activePrimaryNav !== 8 &&
-            activePrimaryNav !== 9 && (
+            activePrimaryNav !== 7 && (
               <ActiveAgentsSidebar
                 sidebarWidth={sidebarWidth}
                 onSidebarWidthChange={(width) => {
@@ -266,9 +264,9 @@ export const App = () => {
                 bodyContent={
                   activePrimaryNav === 2
                     ? (deckSidebarContent ?? undefined)
-                    : activePrimaryNav === 6
+                    : activePrimaryNav === 4
                       ? (conversationsSidebarContent ?? undefined)
-                      : activePrimaryNav === 7
+                      : activePrimaryNav === 5
                         ? (promptsSidebarContent ?? undefined)
                         : undefined
                 }
@@ -406,7 +404,7 @@ export const App = () => {
                 return typeof snapshot.terminalId === "string" ? snapshot.terminalId : undefined;
               },
               onNavigateToConversation: (_sessionId) => {
-                setActivePrimaryNav(6);
+                setActivePrimaryNav(4);
               },
               onCloseActiveSession: (_terminalId, _terminalName, _workspaceMode) => {},
               onDeleteActiveSession: (_terminalId, _terminalName, _workspaceMode) => {},
@@ -418,7 +416,7 @@ export const App = () => {
               onTerminalActivity: (_terminalId: string) => {},
               onRefreshColumns: async () => {},
             }}
-            conversationsEnabled={isUiStateHydrated && activePrimaryNav === 6}
+            conversationsEnabled={isUiStateHydrated && activePrimaryNav === 4}
             onConversationsSidebarContent={setConversationsSidebarContent}
             onConversationsActionPanel={setConversationsActionPanel}
             promptsEnabled={true}
