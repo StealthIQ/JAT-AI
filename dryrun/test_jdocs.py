@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 async def test_context_template():
     from core.jdocs import CONTEXT_TEMPLATE
     assert "<context>" in CONTEXT_TEMPLATE
-    assert "<agents/>" in CONTEXT_TEMPLATE
+    assert "<agents>" in CONTEXT_TEMPLATE
     print("[PASS] context_template: valid XML structure")
 
 

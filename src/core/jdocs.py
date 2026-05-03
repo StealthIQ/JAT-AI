@@ -9,7 +9,8 @@ JDOCS_PATH = ".jules/jdocs"
 
 CONTEXT_TEMPLATE = """<?xml version="1.0" encoding="UTF-8"?>
 <context>
-  <agents/>
+  <agents>
+  </agents>
 </context>
 """
 
