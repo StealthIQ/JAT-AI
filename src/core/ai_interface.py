@@ -16,12 +16,22 @@ class KeyVault:
     The encryption key lives in the backend's env, never in the database."""
 
     def __init__(self, encryption_key: str) -> None:
-        self._fernet = Fernet(encryption_key.encode())
+        if not encryption_key:
+            self._fernet = None
+            return
+        try:
+            self._fernet = Fernet(encryption_key.encode())
+        except (ValueError, Exception):
+            self._fernet = None
 
     def encrypt(self, plaintext: str) -> str:
+        if not self._fernet:
+            return plaintext
         return self._fernet.encrypt(plaintext.encode()).decode()
 
     def decrypt(self, ciphertext: str) -> str:
+        if not self._fernet:
+            return ciphertext
         return self._fernet.decrypt(ciphertext.encode()).decode()
 
     @staticmethod

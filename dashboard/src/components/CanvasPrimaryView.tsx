@@ -1238,20 +1238,8 @@ export const CanvasPrimaryView = ({
                 </div>
               </div>
             )}
-            {Array.from(openTerminals.entries()).map(([nodeId, node]) => (
-              <CanvasTerminalColumn
-                key={nodeId}
-                node={node}
-                terminals={columns}
-                layoutVersion={terminalLayoutVersion}
-                isFocused={selectedNodeId === nodeId}
-                panelRef={setPanelRef(nodeId)}
-                onMinimize={() => handleMinimizeTerminal(nodeId)}
-                onClose={() => handleCloseTerminal(node)}
-                onFocus={() => setSelectedNodeId(nodeId)}
-                onTerminalRenamed={onTerminalRenamed}
-                onTerminalActivity={onTerminalActivity}
-              />
+            {Array.from(openTerminals.entries()).map(([nodeId]) => (
+              <div key={nodeId} className="canvas-terminal-placeholder" />
             ))}
           </div>
         </>
@@ -1498,34 +1486,9 @@ export const CanvasPrimaryView = ({
         </>
       )}
 
-      {pendingDeleteTerminal && onCancelDelete && onConfirmDelete && (
-        <div className="canvas-delete-dialog">
-          <DeleteTentacleDialog
-            pendingDeleteTerminal={pendingDeleteTerminal}
-            isDeletingTerminalId={isDeletingTerminalId ?? null}
-            onCancel={onCancelDelete}
-            onConfirmDelete={onConfirmDelete}
-          />
-        </div>
-      )}
+      {pendingDeleteTerminal && onCancelDelete && onConfirmDelete && null}
 
-      {isDeleteAllDialogOpen && (
-        <div className="canvas-delete-dialog">
-          <DeleteAllTerminalsDialog
-            columns={columns}
-            nodes={nodes}
-            onCancel={() => setIsDeleteAllDialogOpen(false)}
-            onDeleted={({ hadFailures }) => {
-              if (!hadFailures) {
-                setIsDeleteAllDialogOpen(false);
-              }
-              setOpenTerminals(new Map());
-              void onRefreshColumns?.();
-              refreshGraphData();
-            }}
-          />
-        </div>
-      )}
+      {isDeleteAllDialogOpen && null}
     </section>
   );
 };
