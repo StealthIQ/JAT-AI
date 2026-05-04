@@ -15,8 +15,10 @@ export const ActivityPrimaryView = ({
   const [hasGithubKey, setHasGithubKey] = useState(true);
 
   useEffect(() => {
-    fetch("/api/settings").then((r) => r.json()).then((d) => {
-      setHasGithubKey(Boolean(d.github_token));
+    fetch("/api/settings/status").then((r) => r.json()).then((d) => {
+      const ghClassic = d.github_token?.status === "active";
+      const ghFg = d.github_fg_token?.status === "active";
+      setHasGithubKey(ghClassic || ghFg);
     }).catch(() => {});
   }, []);
 

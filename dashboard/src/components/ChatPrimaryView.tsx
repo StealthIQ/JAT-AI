@@ -62,8 +62,6 @@ export const ChatPrimaryView = () => {
     }).catch(() => {});
   }, []);
 
-  const [hasEnvKeys, setHasEnvKeys] = useState(false);
-
   useEffect(() => { fetchConversations(); }, [fetchConversations]);
 
   useEffect(() => {
@@ -78,9 +76,6 @@ export const ChatPrimaryView = () => {
       const types = Object.values(grouped);
       setProviderTypes(types);
       if (types.length > 0 && !selectedProviderType) setSelectedProviderType(types[0].type);
-    }).catch(() => {});
-    fetch("/api/settings").then((r) => r.json()).then((d) => {
-      setHasEnvKeys(Boolean(d.github_token || d.supabase_url));
     }).catch(() => {});
   }, []);
 
@@ -217,7 +212,7 @@ export const ChatPrimaryView = () => {
   const hasExistingMessages = (activeConv?.messages.length ?? 0) > 0;
   const chatEnabled = isStarted || hasExistingMessages;
 
-  const hasProviders = providerTypes.length > 0 || hasEnvKeys;
+  const hasProviders = providerTypes.length > 0;
 
   return (
     <section className="chat-view" aria-label="Chat primary view" style={{ position: "relative" }}>
