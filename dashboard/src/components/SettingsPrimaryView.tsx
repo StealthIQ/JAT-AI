@@ -121,6 +121,17 @@ export const SettingsPrimaryView = (_props: SettingsPrimaryViewProps) => {
         </div>
       </section>
 
+      {editing && (
+        <div className="settings-save-row">
+          <button type="button" className="settings-cancel-btn" onClick={handleCancel}>Cancel</button>
+          <button type="button" className="settings-save-btn" onClick={handleSave} disabled={saving || !hasChanges}>
+            {saving ? "Saving..." : "Save Settings"}
+          </button>
+          {saved && <span className="settings-saved-pill">Saved</span>}
+        </div>
+      )}
+      {!editing && saved && <span className="settings-saved-pill">Saved</span>}
+
       <section className="settings-panel">
         <header className="settings-panel-header">
           <h2>Encryption</h2>
@@ -135,17 +146,6 @@ export const SettingsPrimaryView = (_props: SettingsPrimaryViewProps) => {
           </button>
         </div>
       </section>
-
-      {editing && (
-        <div className="settings-save-row">
-          <button type="button" className="settings-cancel-btn" onClick={handleCancel}>Cancel</button>
-          <button type="button" className="settings-save-btn" onClick={handleSave} disabled={saving || !hasChanges}>
-            {saving ? "Saving..." : "Save Settings"}
-          </button>
-          {saved && <span className="settings-saved-pill">Saved</span>}
-        </div>
-      )}
-      {!editing && saved && <span className="settings-saved-pill">Saved</span>}
 
       {showRegenPopup && (
         <div className="settings-popup-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) { setShowRegenPopup(false); setRegenInput(""); } }}>
