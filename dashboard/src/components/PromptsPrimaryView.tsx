@@ -38,6 +38,8 @@ export const PromptsPrimaryView = ({ enabled, onSidebarContent }: PromptsPrimary
   const [newContent, setNewContent] = useState("");
   const [newXmlContent, setNewXmlContent] = useState("");
   const [newSaving, setNewSaving] = useState(false);
+  const [showDiscardPopup, setShowDiscardPopup] = useState(false);
+  const [pendingSelectName, setPendingSelectName] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmInput, setConfirmInput] = useState("");
 
@@ -85,12 +87,36 @@ export const PromptsPrimaryView = ({ enabled, onSidebarContent }: PromptsPrimary
     }
   }, [newName, newContent, newXmlContent, newCategory, showXml, onRefresh]);
 
+  const hasUnsavedContent = newPromptMode && (newName.trim() !== "" || newContent.trim() !== "" || newXmlContent.trim() !== "");
+
+  const handleSidebarSelect = (name: string) => {
+    if (hasUnsavedContent) {
+      setPendingSelectName(name);
+      setShowDiscardPopup(true);
+    } else {
+      setNewPromptMode(false);
+      selectPromptLibraryItem(name);
+    }
+  };
+
+  const confirmDiscard = () => {
+    setNewPromptMode(false);
+    setNewName("");
+    setNewContent("");
+    setNewXmlContent("");
+    setShowDiscardPopup(false);
+    if (pendingSelectName) {
+      selectPromptLibraryItem(pendingSelectName);
+      setPendingSelectName(null);
+    }
+  };
+
   const sidebarContent = (
     <SidebarPromptsList
       prompts={prompts}
       selectedPromptName={selectedPromptName}
       isLoadingPrompts={isLoadingPrompts}
-      onSelectPrompt={selectPromptLibraryItem}
+      onSelectPrompt={handleSidebarSelect}
       onRefresh={() => { void refreshPrompts(); }}
       onNewPrompt={() => { setShowTemplatePopup(true); }}
     />
@@ -263,6 +289,26 @@ export const PromptsPrimaryView = ({ enabled, onSidebarContent }: PromptsPrimary
                 >
                   Remove
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDiscardPopup && (
+        <div className="prompts-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) { setShowDiscardPopup(false); setPendingSelectName(null); } }}>
+          <div className="prompts-template-popup" style={{ maxWidth: 360 }}>
+            <header className="prompts-template-popup-header">
+              <h3>Discard Changes?</h3>
+              <button type="button" className="prompts-popup-close" onClick={() => { setShowDiscardPopup(false); setPendingSelectName(null); }}>X</button>
+            </header>
+            <div className="prompts-template-popup-body" style={{ padding: "1rem" }}>
+              <p style={{ color: "#a9b0ba", fontSize: "0.78rem", margin: "0 0 0.8rem" }}>
+                You have unsaved changes. Discard and switch to another prompt?
+              </p>
+              <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
+                <button type="button" className="prompts-create-cancel" onClick={() => { setShowDiscardPopup(false); setPendingSelectName(null); }}>Keep Editing</button>
+                <button type="button" className="prompts-create-save" style={{ background: "#c53030" }} onClick={confirmDiscard}>Discard</button>
               </div>
             </div>
           </div>
