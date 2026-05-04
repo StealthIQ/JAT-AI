@@ -79,6 +79,15 @@ async def put_settings(body: SettingsUpdate):
     ENV_PATH.write_text("\n".join(f"{k}={v}" for k, v in env_map.items()) + "\n")
     CONFIG_PATH.write_text(json.dumps(config, indent=2))
 
+    import asyncio
+    import os
+
+    async def _delayed_exit():
+        await asyncio.sleep(0.5)
+        os._exit(0)
+
+    asyncio.get_event_loop().create_task(_delayed_exit())
+
     return {"ok": True}
 
 

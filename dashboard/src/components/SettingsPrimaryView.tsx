@@ -56,9 +56,8 @@ export const SettingsPrimaryView = (_props: SettingsPrimaryViewProps) => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(settings),
     })
-      .then(() => { setSaved(true); setOriginal(settings); setEditing(false); setTimeout(() => setSaved(false), 3000); })
-      .catch(() => {})
-      .finally(() => setSaving(false));
+      .then(() => { setTimeout(() => window.location.reload(), 1000); })
+      .catch(() => setSaving(false));
   }, [settings]);
 
   const handleCancel = () => {
