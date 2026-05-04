@@ -51,6 +51,63 @@ const ProviderTypeDropdown = ({ value, onChange }: { value: string; onChange: (v
   );
 };
 
+type TestPopupProps = {
+  providerId: string;
+  models: { id: string; name: string }[];
+  modelsLoading: boolean;
+  selectedModel: string;
+  modelSearch: string;
+  input: string;
+  response: string;
+  sending: boolean;
+  onModelSearchChange: (v: string) => void;
+  onModelSelect: (v: string) => void;
+  onInputChange: (v: string) => void;
+  onSend: () => void;
+  onClose: () => void;
+  onOpen: () => void;
+};
+
+const TestProviderPopup = (props: TestPopupProps) => {
+  useEffect(() => { props.onOpen(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const filtered = props.models.filter((m) => m.id.toLowerCase().includes(props.modelSearch.toLowerCase()));
+
+  return (
+    <div className="apis-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) props.onClose(); }}>
+      <div className="apis-popup apis-popup--wide">
+        <header className="apis-popup-header"><h3>Test Provider</h3></header>
+        <div className="apis-popup-body">
+          <div className="apis-field">
+            <label>Model</label>
+            <input className="apis-test-model-search" type="text" placeholder="Search models..." value={props.modelSearch} onChange={(e) => props.onModelSearchChange(e.target.value)} />
+            <div className="apis-test-model-list">
+              {props.modelsLoading && <span className="apis-test-model-loading">Loading models...</span>}
+              {!props.modelsLoading && filtered.length === 0 && <span className="apis-test-model-loading">No models found</span>}
+              {filtered.map((m) => (
+                <button key={m.id} type="button" className={`apis-test-model-item${m.id === props.selectedModel ? " is-active" : ""}`} onClick={() => props.onModelSelect(m.id)}>
+                  {m.id}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="apis-field">
+            <label>Message</label>
+            <input type="text" value={props.input} onChange={(e) => props.onInputChange(e.target.value)} placeholder="Say hello..." onKeyDown={(e) => { if (e.key === "Enter" && props.input) props.onSend(); }} />
+          </div>
+          {props.response && <pre className="apis-test-response">{props.response}</pre>}
+        </div>
+        <footer className="apis-popup-footer">
+          <button type="button" onClick={props.onClose}>Close</button>
+          <button type="button" className="apis-submit-btn" disabled={props.sending || !props.selectedModel || !props.input} onClick={props.onSend}>
+            {props.sending ? "Sending..." : "Send"}
+          </button>
+        </footer>
+      </div>
+    </div>
+  );
+};
+
 export const AiProvidersPanel = ({ onAddRef }: { onAddRef: React.MutableRefObject<() => void> }) => {
   const [providers, setProviders] = useState<Provider[]>([]);
   const [showForm, setShowForm] = useState(false);
@@ -61,6 +118,14 @@ export const AiProvidersPanel = ({ onAddRef }: { onAddRef: React.MutableRefObjec
   const [successMsg, setSuccessMsg] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [confirmInput, setConfirmInput] = useState("");
+  const [testProviderId, setTestProviderId] = useState<string | null>(null);
+  const [testModels, setTestModels] = useState<{ id: string; name: string }[]>([]);
+  const [testModel, setTestModel] = useState("");
+  const [testModelSearch, setTestModelSearch] = useState("");
+  const [testModelsLoading, setTestModelsLoading] = useState(false);
+  const [testInput, setTestInput] = useState("");
+  const [testResponse, setTestResponse] = useState("");
+  const [testSending, setTestSending] = useState(false);
 
   const fetchProviders = useCallback(async () => {
     const res = await fetch("/api/providers");
@@ -130,6 +195,8 @@ export const AiProvidersPanel = ({ onAddRef }: { onAddRef: React.MutableRefObjec
               <span>Limit: {p.daily_limit}/day</span>
             </div>
             <div className="apis-card-actions">
+              <button type="button" className="apis-action-btn" onClick={() => { fetch(`/api/providers/${p.id}/docs`).then((r) => r.json()).then((d) => { if (d.url) window.open(d.url, "_blank"); }); }}>Docs</button>
+              <button type="button" className="apis-action-btn" onClick={() => { setTestProviderId(p.id); }}>Test</button>
               <button type="button" className="apis-toggle-btn" onClick={() => void handleToggle(p.id, p.enabled)}>
                 {p.enabled ? "Disable" : "Enable"}
               </button>
@@ -179,6 +246,38 @@ export const AiProvidersPanel = ({ onAddRef }: { onAddRef: React.MutableRefObjec
             </footer>
           </div>
         </div>
+      )}
+
+      {testProviderId && (
+        <TestProviderPopup
+          providerId={testProviderId}
+          models={testModels}
+          modelsLoading={testModelsLoading}
+          selectedModel={testModel}
+          modelSearch={testModelSearch}
+          input={testInput}
+          response={testResponse}
+          sending={testSending}
+          onModelSearchChange={setTestModelSearch}
+          onModelSelect={setTestModel}
+          onInputChange={setTestInput}
+          onSend={() => {
+            setTestSending(true);
+            fetch(`/api/providers/${testProviderId}/test`, {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ model: testModel, message: testInput }),
+            }).then((r) => r.json()).then((d) => setTestResponse(d.response ?? d.error ?? "No response"))
+              .catch(() => setTestResponse("Request failed"))
+              .finally(() => setTestSending(false));
+          }}
+          onClose={() => { setTestProviderId(null); setTestModels([]); setTestModel(""); setTestModelSearch(""); setTestInput(""); setTestResponse(""); }}
+          onOpen={() => {
+            setTestModelsLoading(true);
+            fetch(`/api/providers/${testProviderId}/models`).then((r) => r.json())
+              .then((d) => { setTestModels(d.models ?? []); if (d.models?.length) setTestModel(d.models[0].id); })
+              .catch(() => {}).finally(() => setTestModelsLoading(false));
+          }}
+        />
       )}
     </>
   );
