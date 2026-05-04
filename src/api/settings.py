@@ -6,14 +6,11 @@ from pathlib import Path
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from config import load_settings
-
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 ENV_PATH = PROJECT_ROOT / ".env"
 CONFIG_PATH = PROJECT_ROOT / "config.json"
 
 router = APIRouter()
-settings = load_settings()
 
 
 @router.get("/api/settings")
@@ -25,12 +22,26 @@ async def get_settings():
             db_mode = raw.get("database", {}).get("mode", "local")
         except Exception:
             pass
+
+    env_map = {}
+    if ENV_PATH.exists():
+        for line in ENV_PATH.read_text().splitlines():
+            if "=" in line and not line.startswith("#"):
+                k, v = line.split("=", 1)
+                env_map[k.strip()] = v.strip()
+
+    gh = env_map.get("GITHUB_TOKEN", "")
+    gh_fg = env_map.get("GITHUB_FG_TOKEN", "")
+    sb_url = env_map.get("SUPABASE_URL", "")
+    sb_key = env_map.get("SUPABASE_KEY", "")
+    enc_key = env_map.get("ENCRYPTION_KEY", "")
+
     return {
-        "github_token": settings.github_token[:4] + "..." if settings.github_token else "",
-        "github_fg_token": settings.github_fg_token[:12] + "..." if hasattr(settings, "github_fg_token") and settings.github_fg_token else "",
-        "supabase_url": settings.supabase_url,
-        "supabase_key": settings.supabase_key[:8] + "..." if settings.supabase_key else "",
-        "encryption_key_status": "configured" if settings.encryption_key else "",
+        "github_token": gh[:4] + "..." if gh else "",
+        "github_fg_token": gh_fg[:12] + "..." if gh_fg else "",
+        "supabase_url": sb_url,
+        "supabase_key": sb_key[:8] + "..." if sb_key else "",
+        "encryption_key_status": "configured" if enc_key else "",
         "database_mode": db_mode,
     }
 
