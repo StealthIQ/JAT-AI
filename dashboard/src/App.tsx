@@ -145,6 +145,16 @@ export const App = () => {
   });
 
   useConsoleKeyboardShortcuts({ setActivePrimaryNav });
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const nav = (e as CustomEvent).detail;
+      if (typeof nav === "number") setActivePrimaryNav(nav);
+    };
+    window.addEventListener("navigate", handler);
+    return () => window.removeEventListener("navigate", handler);
+  }, [setActivePrimaryNav]);
+
   const monitorRuntime = useMonitorRuntime({
     enabled: isUiStateHydrated && isMonitorVisible,
   });
