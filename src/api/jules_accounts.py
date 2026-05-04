@@ -38,9 +38,9 @@ async def list_accounts():
         rows = []
     accounts = []
     for r in rows:
-        tier = r.get("plan_tier", "free")
+        tier = r.get("plan_tier", r.get("plan", "free"))
         limits = PLAN_LIMITS.get(tier, PLAN_LIMITS["free"])
-        key_raw = r.get("api_key", "")
+        key_raw = r.get("api_key_encrypted", r.get("api_key", ""))
         masked = f"{key_raw[:4]}...{key_raw[-4:]}" if len(key_raw) > 8 else "****"
         accounts.append({
             "id": r["id"],
@@ -50,7 +50,7 @@ async def list_accounts():
             "daily_limit": limits["daily"],
             "concurrent_limit": limits["concurrent"],
             "sessions_today": r.get("sessions_today", 0),
-            "enabled": r.get("enabled", True),
+            "enabled": bool(r.get("enabled", True)),
         })
     return {"accounts": accounts}
 
@@ -59,13 +59,17 @@ async def list_accounts():
 async def create_account(body: AccountCreate):
     if body.plan_tier not in PLAN_LIMITS:
         raise HTTPException(400, f"Invalid plan tier: {body.plan_tier}")
+    limits = PLAN_LIMITS[body.plan_tier]
     encrypted = vault.encrypt(body.api_key)
     row = {
         "name": body.name,
-        "api_key": encrypted,
+        "api_key_encrypted": encrypted,
         "plan_tier": body.plan_tier,
+        "plan": body.plan_tier,
         "enabled": True,
         "sessions_today": 0,
+        "daily_limit": limits["daily"],
+        "max_daily_tasks": limits["daily"],
     }
     try:
         await db.insert("accounts", row)
@@ -86,7 +90,7 @@ async def patch_account(account_id: str, body: AccountPatch):
     if not updates:
         return {"ok": True}
     try:
-        await db.update("accounts", account_id, updates)
+        await db.update("accounts", updates, {"id": account_id})
     except Exception as e:
         raise HTTPException(500, str(e))
     return {"ok": True}
@@ -95,7 +99,7 @@ async def patch_account(account_id: str, body: AccountPatch):
 @router.delete("/api/jules/accounts/{account_id}")
 async def delete_account(account_id: str):
     try:
-        await db.delete("accounts", account_id)
+        await db.delete("accounts", {"id": account_id})
     except Exception as e:
         raise HTTPException(500, str(e))
     return {"ok": True}
@@ -110,7 +114,7 @@ async def test_account(account_id: str):
     row = next((r for r in rows if str(r["id"]) == account_id), None)
     if not row:
         raise HTTPException(404, "Account not found")
-    key_raw = row.get("api_key", "")
+    key_raw = row.get("api_key_encrypted", row.get("api_key", ""))
     try:
         key = vault.decrypt(key_raw)
     except Exception:
@@ -137,7 +141,7 @@ async def list_jules_sessions(repo: str | None = None):
     for acc in accounts:
         if not acc.get("enabled", True):
             continue
-        key_raw = acc.get("api_key", "")
+        key_raw = acc.get("api_key_encrypted", acc.get("api_key", ""))
         try:
             key = vault.decrypt(key_raw)
         except Exception:
@@ -177,7 +181,7 @@ async def get_session_detail(session_id: str):
         raise HTTPException(404, "DB unavailable")
 
     for acc in accounts:
-        key_raw = acc.get("api_key", "")
+        key_raw = acc.get("api_key_encrypted", acc.get("api_key", ""))
         try:
             key = vault.decrypt(key_raw)
         except Exception:
@@ -211,7 +215,7 @@ async def send_session_message(session_id: str, body: dict):
         raise HTTPException(500, "DB unavailable")
 
     for acc in accounts:
-        key_raw = acc.get("api_key", "")
+        key_raw = acc.get("api_key_encrypted", acc.get("api_key", ""))
         try:
             key = vault.decrypt(key_raw)
         except Exception:

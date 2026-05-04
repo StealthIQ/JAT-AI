@@ -102,7 +102,8 @@
   gap: 0.3rem;
 }
 
-.apis-field span {
+.apis-field span,
+.apis-field label {
   font-size: 0.72rem;
   font-weight: 600;
   text-transform: uppercase;
@@ -195,6 +196,48 @@
   gap: 0.5rem;
   padding: 1rem 1.5rem;
   border-top: 1px solid #1e2228;
+}
+
+.apis-popup-footer button {
+  font-family: var(--font-main);
+  font-size: 0.78rem;
+  padding: 0.4rem 0.8rem;
+  border: 1px solid #2b2f36;
+  border-radius: 4px;
+  background: #141920;
+  color: #8b949e;
+  cursor: pointer;
+}
+
+.apis-popup-footer button:hover {
+  color: #e6edf3;
+  background: #1e2228;
+}
+
+.apis-popup-footer .apis-submit-btn {
+  background: var(--accent-primary);
+  border: none;
+  color: #000;
+  font-weight: 600;
+}
+
+.apis-popup-footer .apis-submit-btn:hover {
+  background: #00c4d9;
+}
+
+.apis-popup-footer .apis-submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: var(--accent-primary);
+}
+
+.apis-popup-footer .apis-submit-btn--danger {
+  background: #c53030;
+  color: #fff;
+}
+
+.apis-popup-footer .apis-submit-btn--danger:hover {
+  background: #e05555;
 }
 
 .apis-popup-cancel {

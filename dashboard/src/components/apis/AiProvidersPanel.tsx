@@ -186,21 +186,23 @@ export const AiProvidersPanel = ({ onAddRef }: { onAddRef: React.MutableRefObjec
       <div className="apis-list">
         {providers.length === 0 && <p className="apis-empty">No AI provider keys configured.</p>}
         {providers.map((p) => (
-          <div key={p.id} className={`apis-card${p.enabled ? "" : " apis-card--disabled"}`}>
+          <div key={p.id} className="apis-card" data-enabled={p.enabled}>
             <div className="apis-card-header">
               <span className="apis-card-name">{p.name}</span>
-              <span className="apis-card-type">{p.provider_type}</span>
+              <span className={`apis-card-status ${p.enabled ? "apis-card-status--on" : "apis-card-status--off"}`}>
+                {p.enabled ? "active" : "disabled"}
+              </span>
             </div>
-            <div className="apis-card-body">
-              <span>Limit: {p.daily_limit}/day</span>
+            <div className="apis-card-details">
+              <span>Limit: {p.daily_limit || "unlimited"}/day</span>
             </div>
             <div className="apis-card-actions">
-              <button type="button" className="apis-action-btn" onClick={() => { fetch(`/api/providers/${p.id}/docs`).then((r) => r.json()).then((d) => { if (d.url) window.open(d.url, "_blank"); }); }}>Docs</button>
-              <button type="button" className="apis-action-btn" onClick={() => { setTestProviderId(p.id); }}>Test</button>
-              <button type="button" className="apis-toggle-btn" onClick={() => void handleToggle(p.id, p.enabled)}>
+              <button type="button" onClick={() => { fetch(`/api/providers/${p.id}/docs`).then((r) => r.json()).then((d) => { if (d.url) window.open(d.url, "_blank"); }); }}>Docs</button>
+              <button type="button" onClick={() => { setTestProviderId(p.id); }}>Test</button>
+              <button type="button" onClick={() => void handleToggle(p.id, p.enabled)}>
                 {p.enabled ? "Disable" : "Enable"}
               </button>
-              <button type="button" className="apis-delete-btn" onClick={() => setConfirmDeleteId(p.id)}>Remove</button>
+              <button type="button" className="apis-card-delete" onClick={() => setConfirmDeleteId(p.id)}>Remove</button>
             </div>
           </div>
         ))}
@@ -237,11 +239,13 @@ export const AiProvidersPanel = ({ onAddRef }: { onAddRef: React.MutableRefObjec
       {confirmDeleteId && (
         <div className="apis-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) { setConfirmDeleteId(null); setConfirmInput(""); } }}>
           <div className="apis-popup apis-popup--narrow">
-            <h3>Remove Provider</h3>
-            <p className="apis-confirm-text">Type "confirm" to remove this key permanently.</p>
-            <input className="apis-confirm-input" type="text" value={confirmInput} onChange={(e) => setConfirmInput(e.target.value)} placeholder="confirm" />
+            <header className="apis-popup-header"><h3>Remove Provider</h3></header>
+            <div className="apis-popup-body">
+              <p className="apis-confirm-text">Type "confirm" to remove this key permanently.</p>
+              <input className="apis-confirm-input" type="text" value={confirmInput} onChange={(e) => setConfirmInput(e.target.value)} placeholder="confirm" />
+            </div>
             <footer className="apis-popup-footer">
-              <button type="button" onClick={() => { setConfirmDeleteId(null); setConfirmInput(""); }}>Cancel</button>
+              <button type="button" className="apis-popup-cancel" onClick={() => { setConfirmDeleteId(null); setConfirmInput(""); }}>Cancel</button>
               <button type="button" className="apis-submit-btn apis-submit-btn--danger" disabled={confirmInput !== "confirm"} onClick={() => void handleDelete(confirmDeleteId)}>Remove</button>
             </footer>
           </div>

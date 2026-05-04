@@ -75,20 +75,23 @@ export const JulesAccountsPanel = ({ onAddRef }: { onAddRef: React.MutableRefObj
       <div className="apis-list">
         {accounts.length === 0 && <p className="apis-empty">No Jules accounts configured.</p>}
         {accounts.map((a) => (
-          <div key={a.id} className={`apis-card${a.enabled ? "" : " apis-card--disabled"}`}>
+          <div key={a.id} className="apis-card" data-enabled={a.enabled}>
             <div className="apis-card-header">
-              <span className="apis-card-name">{a.name}</span>
               <span className="apis-card-type">{a.plan_tier.toUpperCase()}</span>
+              <span className="apis-card-name">{a.name}</span>
+              <span className={`apis-card-status ${a.enabled ? "apis-card-status--on" : "apis-card-status--off"}`}>
+                {a.enabled ? "active" : "disabled"}
+              </span>
             </div>
-            <div className="apis-card-body">
+            <div className="apis-card-details">
               <span>Daily: {a.sessions_today}/{a.daily_limit}</span>
               <span>Concurrent: {a.concurrent_limit}</span>
             </div>
             <div className="apis-card-actions">
-              <button type="button" className="apis-toggle-btn" onClick={() => handleToggle(a.id, a.enabled)}>
+              <button type="button" onClick={() => handleToggle(a.id, a.enabled)}>
                 {a.enabled ? "Disable" : "Enable"}
               </button>
-              <button type="button" className="apis-delete-btn" onClick={() => setConfirmDeleteId(a.id)}>Remove</button>
+              <button type="button" className="apis-card-delete" onClick={() => setConfirmDeleteId(a.id)}>Remove</button>
             </div>
           </div>
         ))}
@@ -127,11 +130,13 @@ export const JulesAccountsPanel = ({ onAddRef }: { onAddRef: React.MutableRefObj
       {confirmDeleteId && (
         <div className="apis-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) { setConfirmDeleteId(null); setConfirmInput(""); } }}>
           <div className="apis-popup apis-popup--narrow">
-            <h3>Remove Account</h3>
-            <p className="apis-confirm-text">Type "confirm" to remove this account permanently.</p>
-            <input className="apis-confirm-input" type="text" value={confirmInput} onChange={(e) => setConfirmInput(e.target.value)} placeholder="confirm" />
+            <header className="apis-popup-header"><h3>Remove Account</h3></header>
+            <div className="apis-popup-body">
+              <p className="apis-confirm-text">Type "confirm" to remove this account permanently.</p>
+              <input className="apis-confirm-input" type="text" value={confirmInput} onChange={(e) => setConfirmInput(e.target.value)} placeholder="confirm" />
+            </div>
             <footer className="apis-popup-footer">
-              <button type="button" onClick={() => { setConfirmDeleteId(null); setConfirmInput(""); }}>Cancel</button>
+              <button type="button" className="apis-popup-cancel" onClick={() => { setConfirmDeleteId(null); setConfirmInput(""); }}>Cancel</button>
               <button type="button" className="apis-submit-btn apis-submit-btn--danger" disabled={confirmInput !== "confirm"} onClick={() => handleDelete(confirmDeleteId)}>Remove</button>
             </footer>
           </div>

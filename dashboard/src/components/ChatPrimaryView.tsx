@@ -31,6 +31,7 @@ export const ChatPrimaryView = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const [providerTypes, setProviderTypes] = useState<ProviderGroup[]>([]);
+  const [providersLoaded, setProvidersLoaded] = useState(false);
   const [selectedProviderType, setSelectedProviderType] = useState("");
   const [models, setModels] = useState<{ id: string; name: string }[]>([]);
   const [selectedModel, setSelectedModel] = useState("");
@@ -76,7 +77,7 @@ export const ChatPrimaryView = () => {
       const types = Object.values(grouped);
       setProviderTypes(types);
       if (types.length > 0 && !selectedProviderType) setSelectedProviderType(types[0].type);
-    }).catch(() => {});
+    }).catch(() => {}).finally(() => setProvidersLoaded(true));
   }, []);
 
   useEffect(() => {
@@ -137,7 +138,6 @@ export const ChatPrimaryView = () => {
         const assistantMsg: Message = { id: `m-${Date.now() + 1}`, role: "assistant", content, timestamp: new Date().toISOString(), model: selectedModel };
         setConversations((prev) => prev.map((c) => c.id === activeConvId ? { ...c, messages: [...c.messages, assistantMsg] } : c));
         setUsage((u) => ({ ...u, tokensUsed: u.tokensUsed + content.length }));
-        // Detect plan JSON in AI response to enable the Approve button
         if (mode === "plan" && (content.includes('"tasks"') || content.includes('"execution_mode"'))) {
           exec.setPlanReady(true);
         }
@@ -212,11 +212,9 @@ export const ChatPrimaryView = () => {
   const hasExistingMessages = (activeConv?.messages.length ?? 0) > 0;
   const chatEnabled = isStarted || hasExistingMessages;
 
-  const hasProviders = providerTypes.length > 0;
-
   return (
     <section className="chat-view" aria-label="Chat primary view" style={{ position: "relative" }}>
-      {!hasProviders && (
+      {providersLoaded && providerTypes.length === 0 && (
         <div className="apis-setup-overlay">
           <div className="apis-setup-card">
             <h3>AI Provider Key Required</h3>
