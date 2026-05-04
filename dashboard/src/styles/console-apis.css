@@ -625,3 +625,86 @@
   border-radius: 3px;
   justify-self: center;
 }
+
+.apis-custom-dropdown {
+  position: relative;
+}
+
+.apis-custom-dropdown-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.4rem 0.5rem;
+  background: #0c141f;
+  border: 1px solid #2b2f36;
+  color: #e6e8ec;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.75rem;
+  cursor: pointer;
+  text-align: left;
+}
+
+.apis-custom-dropdown-trigger:hover {
+  border-color: #3a4555;
+}
+
+.apis-custom-dropdown-arrow {
+  color: #6b7a90;
+  font-size: 0.7rem;
+}
+
+.apis-custom-dropdown-panel {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  background: #0b0d10;
+  border: 1px solid #2b2f36;
+  border-top: none;
+  display: grid;
+  gap: 0;
+}
+
+.apis-custom-dropdown-search {
+  padding: 0.35rem 0.5rem;
+  background: #0c141f;
+  border: none;
+  border-bottom: 1px solid #2b2f36;
+  color: #e6e8ec;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.72rem;
+  outline: none;
+}
+
+.apis-custom-dropdown-search:focus {
+  background: #111820;
+}
+
+.apis-custom-dropdown-list {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.apis-custom-dropdown-item {
+  width: 100%;
+  text-align: left;
+  padding: 0.38rem 0.5rem;
+  background: none;
+  border: none;
+  color: #b8c2d1;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.apis-custom-dropdown-item:hover {
+  background: #1a1f2e;
+  color: #e6e8ec;
+}
+
+.apis-custom-dropdown-item.is-active {
+  background: color-mix(in srgb, var(--accent-primary) 18%, #0b0d10);
+  color: var(--accent-primary);
+}

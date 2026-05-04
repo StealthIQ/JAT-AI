@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type React } from "react";
+import { useCallback, useEffect, useRef, useState, type React } from "react";
 
 type Provider = {
   id: string;
@@ -13,6 +13,43 @@ const PROVIDER_TYPES = [
   "cohere", "mistral", "nvidia_nim", "github_models", "huggingface",
   "sambanova", "fireworks", "nebius", "hyperbolic", "scaleway", "longcat",
 ];
+
+const ProviderTypeDropdown = ({ value, onChange }: { value: string; onChange: (v: string) => void }) => {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const filtered = PROVIDER_TYPES.filter((t) => t.includes(search.toLowerCase()));
+
+  return (
+    <div className="apis-custom-dropdown" ref={ref}>
+      <button type="button" className="apis-custom-dropdown-trigger" onClick={() => setOpen(!open)}>
+        <span>{value.toUpperCase()}</span>
+        <span className="apis-custom-dropdown-arrow">▾</span>
+      </button>
+      {open && (
+        <div className="apis-custom-dropdown-panel">
+          <input className="apis-custom-dropdown-search" type="text" placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} autoFocus />
+          <div className="apis-custom-dropdown-list">
+            {filtered.map((t) => (
+              <button key={t} type="button" className={`apis-custom-dropdown-item${t === value ? " is-active" : ""}`} onClick={() => { onChange(t); setOpen(false); setSearch(""); }}>
+                {t.toUpperCase()}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const AiProvidersPanel = ({ onAddRef }: { onAddRef: React.MutableRefObject<() => void> }) => {
   const [providers, setProviders] = useState<Provider[]>([]);
@@ -109,9 +146,7 @@ export const AiProvidersPanel = ({ onAddRef }: { onAddRef: React.MutableRefObjec
             <div className="apis-popup-body">
               <div className="apis-field">
                 <label>Provider Type</label>
-                <select value={formType} onChange={(e) => { setFormType(e.target.value); setFormName(getNextName(e.target.value)); }}>
-                  {PROVIDER_TYPES.map((t) => <option key={t} value={t}>{t.toUpperCase()}</option>)}
-                </select>
+                <ProviderTypeDropdown value={formType} onChange={(v) => { setFormType(v); setFormName(getNextName(v)); }} />
               </div>
               <div className="apis-field">
                 <label>Name</label>
