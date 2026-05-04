@@ -128,17 +128,29 @@ async def _check_github_token(token: str) -> dict:
 async def get_settings_status():
     import httpx
 
+    env_map = {}
+    if ENV_PATH.exists():
+        for line in ENV_PATH.read_text().splitlines():
+            if "=" in line and not line.startswith("#"):
+                k, v = line.split("=", 1)
+                env_map[k.strip()] = v.strip()
+
+    gh_token = env_map.get("GITHUB_TOKEN", "")
+    gh_fg = env_map.get("GITHUB_FG_TOKEN", "")
+    sb_url = env_map.get("SUPABASE_URL", "")
+    sb_key = env_map.get("SUPABASE_KEY", "")
+
     results = {
-        "github_token": await _check_github_token(settings.github_token),
-        "github_fg_token": await _check_github_token(getattr(settings, "github_fg_token", "")),
+        "github_token": await _check_github_token(gh_token),
+        "github_fg_token": await _check_github_token(gh_fg),
     }
 
-    if settings.supabase_url and settings.supabase_key:
+    if sb_url and sb_key:
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 res = await client.get(
-                    f"{settings.supabase_url}/rest/v1/",
-                    headers={"apikey": settings.supabase_key, "Authorization": f"Bearer {settings.supabase_key}"},
+                    f"{sb_url}/rest/v1/",
+                    headers={"apikey": sb_key, "Authorization": f"Bearer {sb_key}"},
                 )
             if res.status_code == 200:
                 results["supabase"] = {"status": "active"}
