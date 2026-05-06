@@ -116,7 +116,7 @@
 .chat-usage-stats {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.3rem;
   margin-left: auto;
 }
 
@@ -129,7 +129,6 @@
 .chat-usage-label {
   font-size: 0.62rem;
   color: #5a6a7e;
-  min-width: 38px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -153,7 +152,6 @@
   font-size: 0.62rem;
   color: #6b7a90;
   font-variant-numeric: tabular-nums;
-  min-width: 50px;
 }
 
 .chat-delete-btn {
