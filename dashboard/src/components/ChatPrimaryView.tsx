@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { marked } from "marked";
 import { TaskListPanel } from "./TaskListPanel";
 import { useLiveTaskStatus } from "../app/hooks/useLiveTaskStatus";
 import { SearchableDropdown } from "./chat/SearchableDropdown";
 import { useExecutionActions } from "./chat/useExecutionActions";
+
+marked.setOptions({ breaks: true, gfm: true });
 
 type Message = {
   id: string;
@@ -374,10 +377,14 @@ export const ChatPrimaryView = () => {
                 )}
                 {activeConv.messages.map((msg) => {
                   const { text, action } = msg.role === "assistant" ? parseMessageActions(msg.content) : { text: msg.content, action: null };
+                  const rendered = msg.role === "assistant" ? marked.parse(text) as string : text;
                   return (
                     <div key={msg.id} className={`chat-msg chat-msg--${msg.role}`}>
                       <span className="chat-msg-role">{msg.role === "user" ? "You" : msg.model ?? "AI"}</span>
-                      <div className="chat-msg-content">{text}</div>
+                      {msg.role === "assistant"
+                        ? <div className="chat-msg-content chat-md" dangerouslySetInnerHTML={{ __html: rendered }} />
+                        : <div className="chat-msg-content">{text}</div>
+                      }
                       {action && (
                         <button type="button" className="chat-action-btn" onClick={() => handleAction(action.type, action.payload)}>
                           {action.type === "SWITCH_MODE" && `Switch to ${action.payload.toUpperCase()} mode`}

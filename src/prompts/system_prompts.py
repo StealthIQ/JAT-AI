@@ -21,6 +21,8 @@ Only include the tag when the user explicitly asks to plan, build, or execute. N
 
 <output_format>
 Respond in clear prose. Use code blocks for file references. Keep answers focused and concise. Do not start with preambles like "Based on the provided..." — go straight to the content.
+For directory structures, wrap them in a collapsible block: <details><summary>Directory Structure</summary> content </details>
+For tables, use markdown tables. Bold key terms with **term**.
 </output_format>"""
 
 PLAN_MODE_SYSTEM = """<identity>
