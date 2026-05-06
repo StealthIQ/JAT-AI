@@ -393,7 +393,17 @@ export const ChatPrimaryView = () => {
                 <div className="chat-delete-popup">
                   <div className="chat-delete-popup-inner">
                     <p>Type <strong>delete chat</strong> to confirm deletion</p>
-                    <input type="text" value={deleteInput} onChange={(e) => setDeleteInput(e.target.value)} placeholder="delete chat" autoFocus />
+                    <input type="text" value={deleteInput} onChange={(e) => setDeleteInput(e.target.value)} placeholder="delete chat" autoFocus onKeyDown={(e) => {
+                      if (e.key === "Enter" && deleteInput === "delete chat" && activeConvId) {
+                        fetch(`/api/conversations/${activeConvId}`, { method: "DELETE" }).catch(() => {});
+                        setConversations((prev) => prev.filter((c) => c.id !== activeConvId));
+                        const remaining = conversations.filter((c) => c.id !== activeConvId);
+                        setActiveConvId(remaining.length > 0 ? remaining[0].id : null);
+                        setShowDeleteConfirm(false);
+                        setDeleteInput("");
+                        setIsStarted(false);
+                      }
+                    }} />
                     <div className="chat-delete-popup-actions">
                       <button type="button" onClick={() => { setShowDeleteConfirm(false); setDeleteInput(""); }}>Cancel</button>
                       <button type="button" className="chat-delete-confirm-btn" disabled={deleteInput !== "delete chat"} onClick={() => {
