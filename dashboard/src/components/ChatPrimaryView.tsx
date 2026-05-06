@@ -96,8 +96,6 @@ export const ChatPrimaryView = () => {
 
   useEffect(() => {
     if (!activeConvId) return;
-    const conv = conversations.find((c) => c.id === activeConvId);
-    if (conv && conv.messages.length > 0) return;
     fetch(`/api/conversations/${activeConvId}/messages`)
       .then((r) => r.json())
       .then((d) => {
@@ -108,10 +106,10 @@ export const ChatPrimaryView = () => {
           timestamp: m.created_at ?? m.timestamp ?? new Date().toISOString(),
           model: m.model,
         }));
-        if (msgs.length > 0) {
-          setConversations((prev) => prev.map((c) => c.id === activeConvId ? { ...c, messages: msgs } : c));
-          setIsStarted(true);
-        }
+        setConversations((prev) => prev.map((c) => c.id === activeConvId
+          ? { ...c, messages: msgs.length > 0 ? msgs : c.messages }
+          : c));
+        if (msgs.length > 0) setIsStarted(true);
       })
       .catch(() => {});
   }, [activeConvId]);
@@ -335,7 +333,7 @@ export const ChatPrimaryView = () => {
         <input className="chat-search" type="text" placeholder="Search chats..." value={chatSearch} onChange={(e) => setChatSearch(e.target.value)} />
         <div className="chat-conv-list">
           {conversations.filter((c) => c.title.toLowerCase().includes(chatSearch.toLowerCase())).map((c) => (
-            <button key={c.id} type="button" className={`chat-conv-item${activeConvId === c.id ? " is-active" : ""}`} onClick={() => setActiveConvId(c.id)}>
+            <button key={c.id} type="button" className={`chat-conv-item${activeConvId === c.id ? " is-active" : ""}`} onClick={() => { setActiveConvId(c.id); setIsStarted(c.messages.length > 0); }}>
               <div className="chat-conv-row">
                 <span className="chat-conv-title">{c.title}</span>
                 <span className="chat-conv-id">{c.id.slice(-6)}</span>
@@ -395,7 +393,7 @@ export const ChatPrimaryView = () => {
                     <span className="chat-setup-text">Setting up — analyzing repository...</span>
                   </div>
                 )}
-                {!chatEnabled && !isAnalyzing && activeConv.messages.length === 0 && (
+                {!isStarted && !isAnalyzing && activeConv.messages.length === 0 && (
                   <div className="chat-setup-overlay">
                     <span className="chat-setup-text">Select a repo and click Start to begin</span>
                   </div>
