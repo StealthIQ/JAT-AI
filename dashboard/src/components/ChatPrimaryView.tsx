@@ -336,8 +336,14 @@ export const ChatPrimaryView = () => {
         <div className="chat-conv-list">
           {conversations.filter((c) => c.title.toLowerCase().includes(chatSearch.toLowerCase())).map((c) => (
             <button key={c.id} type="button" className={`chat-conv-item${activeConvId === c.id ? " is-active" : ""}`} onClick={() => setActiveConvId(c.id)}>
-              <span className="chat-conv-title">{c.title}</span>
-              <span className="chat-conv-meta">{c.model ? c.model.split("/").pop() : "no model"}</span>
+              <div className="chat-conv-row">
+                <span className="chat-conv-title">{c.title}</span>
+                <span className="chat-conv-id">{c.id.slice(-6)}</span>
+              </div>
+              <div className="chat-conv-row">
+                <span className="chat-conv-meta">{c.model ? c.model.split("/").pop() : "no model"}</span>
+                <span className="chat-conv-date">{new Date(c.createdAt).toLocaleDateString()} {new Date(c.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+              </div>
             </button>
           ))}
         </div>

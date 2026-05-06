@@ -62,6 +62,24 @@
   color: #5a6a7e;
 }
 
+.chat-conv-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.chat-conv-id {
+  font-size: 0.6rem;
+  color: #4a5568;
+  font-family: var(--font-mono, monospace);
+}
+
+.chat-conv-date {
+  font-size: 0.6rem;
+  color: #e6e8ec;
+}
+
 .chat-main {
   display: flex;
   flex-direction: column;
