@@ -6,7 +6,10 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from config import load_settings
-from core.rag_store import query_context, store_context
+from core.adaptive_context import detect_referenced_chunks, get_boosted_results, record_chunk_usage
+from core.context_compressor import compress_context
+from core.conversation_summarizer import build_summarized_history, should_summarize
+from core.rag_store import store_context
 from db import db
 
 router = APIRouter()
@@ -228,19 +231,33 @@ async def chat_send(request: ChatRequest):
     if not keys:
         raise HTTPException(400, f"No enabled keys for provider: {request.provider_type}")
 
-    messages = _build_messages(request)
+    raw_messages = [{"role": m.role, "content": m.content} for m in request.messages]
+    if should_summarize(raw_messages):
+        raw_messages = build_summarized_history(raw_messages)
+        request_copy = request.model_copy()
+        request_copy.messages = [ChatMessage(role=m["role"], content=m["content"]) for m in raw_messages]
+        messages = _build_messages(request_copy)
+    else:
+        messages = _build_messages(request)
+
     system = request.system or MODE_SYSTEM_PROMPTS.get(request.mode, "")
 
     if request.mode in ("plan", "auto") and not request.system:
         system = await _inject_available_skills(system)
 
+    injected_chunks: list[str] = []
     if request.repo and request.messages:
         parts = request.repo.split("/", 1)
         if len(parts) == 2:
             user_query = request.messages[-1].content
-            rag_chunks = await query_context(parts[0], parts[1], user_query, n_results=5)
+            try:
+                rag_chunks = await get_boosted_results(parts[0], parts[1], user_query, n_results=5)
+            except Exception:
+                rag_chunks = []
             if rag_chunks:
-                rag_block = "\n---\n".join(rag_chunks)
+                injected_chunks = rag_chunks
+                compressed = [compress_context(c) for c in rag_chunks]
+                rag_block = "\n---\n".join(compressed)
                 system += f"\n\n<relevant_context>\n{rag_block}\n</relevant_context>"
 
     system += THINK_INSTRUCTION
@@ -259,6 +276,17 @@ async def chat_send(request: ChatRequest):
                 system=system,
             )
             await _handle_save_context(request.repo, response)
+
+            if injected_chunks and request.repo:
+                try:
+                    referenced = await detect_referenced_chunks(response, injected_chunks)
+                    if referenced:
+                        collection = request.repo.replace("/", "__")
+                        chunk_ids = [f"{collection}_{hash(c[:100]) & 0xFFFFFFFF}" for c in referenced]
+                        await record_chunk_usage(collection, chunk_ids)
+                except Exception:
+                    pass
+
             return ChatResponse(
                 response=response,
                 provider_id=provider_id,
