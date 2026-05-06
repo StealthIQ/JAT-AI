@@ -32,6 +32,7 @@ class ProviderType(StrEnum):
     HYPERBOLIC = "hyperbolic"
     SCALEWAY = "scaleway"
     LONGCAT = "longcat"
+    DEEPSEEK = "deepseek"
 
 
 # Verified free tier limits as of April 2026
@@ -122,6 +123,15 @@ PROVIDER_LIMITS = {
         },
         "notes": "Free. OpenAI and Anthropic compatible. LongCat series models only.",
     },
+    ProviderType.DEEPSEEK: {
+        "models": {
+            "deepseek-v4-pro": {"rpm": 60, "rpd": 10000, "tpm": 1000000, "context": 1000000},
+            "deepseek-v4-flash": {"rpm": 60, "rpd": 10000, "tpm": 1000000, "context": 1000000},
+            "deepseek-chat": {"rpm": 60, "rpd": 10000, "tpm": 1000000},
+            "deepseek-reasoner": {"rpm": 60, "rpd": 10000, "tpm": 1000000},
+        },
+        "notes": "OpenAI-compatible. V4 Pro at 75% discount until 2026/05/31. 1M context window.",
+    },
 }
 
 
@@ -143,6 +153,7 @@ DEFAULT_BASE_URLS = {
     ProviderType.HYPERBOLIC: "https://api.hyperbolic.xyz/v1",
     ProviderType.SCALEWAY: "https://api.scaleway.ai/v1",
     ProviderType.LONGCAT: "https://api.longcat.chat/openai/v1",
+    ProviderType.DEEPSEEK: "https://api.deepseek.com",
 }
 
 
