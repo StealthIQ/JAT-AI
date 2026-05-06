@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { marked } from "marked";
 import { TaskListPanel } from "./TaskListPanel";
 import { useLiveTaskStatus } from "../app/hooks/useLiveTaskStatus";
@@ -25,6 +25,34 @@ function wrapSectionsCollapsible(html: string): string {
   if (inSection) result.push("</details>");
   return result.join("\n");
 }
+
+const ChatMessageBubble = memo(({ msg, renderPlanJson, parseMessageActions, handleAction }: {
+  msg: { id: string; role: string; content: string; model?: string };
+  renderPlanJson: (text: string) => string | null;
+  parseMessageActions: (content: string) => { text: string; action: { type: string; payload: string } | null };
+  handleAction: (type: string, payload: string) => void;
+}) => {
+  const { text, action } = msg.role === "assistant" ? parseMessageActions(msg.content) : { text: msg.content, action: null };
+  const rendered = msg.role === "assistant"
+    ? (renderPlanJson(text) || wrapSectionsCollapsible(marked.parse(text) as string))
+    : text;
+  return (
+    <div className={`chat-msg chat-msg--${msg.role}`}>
+      <span className="chat-msg-role">{msg.role === "user" ? "You" : msg.model ?? "AI"}</span>
+      {msg.role === "assistant"
+        ? <div className="chat-msg-content chat-md" dangerouslySetInnerHTML={{ __html: rendered }} />
+        : <div className="chat-msg-content">{text}</div>
+      }
+      {action && (
+        <button type="button" className="chat-action-btn" onClick={() => handleAction(action.type, action.payload)}>
+          {action.type === "SWITCH_MODE" && `Switch to ${action.payload.toUpperCase()} mode`}
+          {action.type === "APPROVE_PLAN" && "Approve Plan"}
+          {action.type === "APPROVE_BUILD" && "Approve Build"}
+        </button>
+      )}
+    </div>
+  );
+});
 
 type Message = {
   id: string;
@@ -98,6 +126,11 @@ export const ChatPrimaryView = () => {
 
   useEffect(() => {
     if (!activeConvId) return;
+    const conv = conversations.find((c) => c.id === activeConvId);
+    if (conv && conv.messages.length > 0) {
+      setIsStarted(true);
+      return;
+    }
     fetch(`/api/conversations/${activeConvId}/messages`)
       .then((r) => r.json())
       .then((d) => {
@@ -111,7 +144,6 @@ export const ChatPrimaryView = () => {
         setConversations((prev) => prev.map((c) => c.id === activeConvId
           ? { ...c, messages: msgs.length > 0 ? msgs : c.messages }
           : c));
-        const conv = conversations.find((c) => c.id === activeConvId);
         const wasStarted = msgs.length > 0 || (conv?.title !== "New conversation" && conv?.title !== "Untitled");
         setIsStarted(wasStarted);
       })
@@ -335,9 +367,6 @@ export const ChatPrimaryView = () => {
       return html;
     } catch { return null; }
   };
-      exec.handleApprove();
-    }
-  };
 
   const showTasks = (mode === "plan" || mode === "build" || mode === "auto") && tasks.length > 0;
   const hasExistingMessages = (activeConv?.messages.length ?? 0) > 0;
@@ -461,28 +490,9 @@ export const ChatPrimaryView = () => {
                     <span className="chat-setup-text">Select a repo and click Start to begin</span>
                   </div>
                 )}
-                {activeConv.messages.map((msg) => {
-                  const { text, action } = msg.role === "assistant" ? parseMessageActions(msg.content) : { text: msg.content, action: null };
-                  const rendered = msg.role === "assistant"
-                    ? (renderPlanJson(text) || wrapSectionsCollapsible(marked.parse(text) as string))
-                    : text;
-                  return (
-                    <div key={msg.id} className={`chat-msg chat-msg--${msg.role}`}>
-                      <span className="chat-msg-role">{msg.role === "user" ? "You" : msg.model ?? "AI"}</span>
-                      {msg.role === "assistant"
-                        ? <div className="chat-msg-content chat-md" dangerouslySetInnerHTML={{ __html: rendered }} />
-                        : <div className="chat-msg-content">{text}</div>
-                      }
-                      {action && (
-                        <button type="button" className="chat-action-btn" onClick={() => handleAction(action.type, action.payload)}>
-                          {action.type === "SWITCH_MODE" && `Switch to ${action.payload.toUpperCase()} mode`}
-                          {action.type === "APPROVE_PLAN" && "Approve Plan"}
-                          {action.type === "APPROVE_BUILD" && "Approve Build"}
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
+                {activeConv.messages.map((msg) => (
+                  <ChatMessageBubble key={msg.id} msg={msg} renderPlanJson={renderPlanJson} parseMessageActions={parseMessageActions} handleAction={handleAction} />
+                ))}
                 {isTyping && (
                   <div className="chat-msg chat-msg--assistant">
                     <span className="chat-msg-role">AI</span>
