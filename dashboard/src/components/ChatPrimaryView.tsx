@@ -312,6 +312,33 @@ export const ChatPrimaryView = () => {
     }
   };
 
+  const renderPlanJson = (text: string): string | null => {
+    const jsonMatch = text.match(/```json\s*([\s\S]*?)```/);
+    if (!jsonMatch) return null;
+    try {
+      const plan = JSON.parse(jsonMatch[1]);
+      if (!plan.tasks) return null;
+      const before = text.slice(0, text.indexOf("```json")).trim();
+      const after = text.slice(text.indexOf("```", text.indexOf("```json") + 7) + 3).trim();
+      let html = before ? marked.parse(before) as string : "";
+      html += `<div class="chat-plan-tasks">`;
+      for (const task of plan.tasks) {
+        html += `<div class="chat-plan-task">`;
+        html += `<div class="chat-plan-task-header"><span class="chat-plan-task-id">${task.id}</span><span class="chat-plan-task-branch">${task.branch || ""}</span></div>`;
+        html += `<div class="chat-plan-task-desc">${task.description}</div>`;
+        if (task.exit_criteria) html += `<div class="chat-plan-task-criteria">${task.exit_criteria}</div>`;
+        if (task.dependencies?.length) html += `<div class="chat-plan-task-deps">Depends: ${task.dependencies.join(", ")}</div>`;
+        html += `</div>`;
+      }
+      html += `</div>`;
+      if (after) html += marked.parse(after) as string;
+      return html;
+    } catch { return null; }
+  };
+      exec.handleApprove();
+    }
+  };
+
   const showTasks = (mode === "plan" || mode === "build" || mode === "auto") && tasks.length > 0;
   const hasExistingMessages = (activeConv?.messages.length ?? 0) > 0;
   const chatEnabled = isStarted || hasExistingMessages;
@@ -436,7 +463,9 @@ export const ChatPrimaryView = () => {
                 )}
                 {activeConv.messages.map((msg) => {
                   const { text, action } = msg.role === "assistant" ? parseMessageActions(msg.content) : { text: msg.content, action: null };
-                  const rendered = msg.role === "assistant" ? wrapSectionsCollapsible(marked.parse(text) as string) : text;
+                  const rendered = msg.role === "assistant"
+                    ? (renderPlanJson(text) || wrapSectionsCollapsible(marked.parse(text) as string))
+                    : text;
                   return (
                     <div key={msg.id} className={`chat-msg chat-msg--${msg.role}`}>
                       <span className="chat-msg-role">{msg.role === "user" ? "You" : msg.model ?? "AI"}</span>

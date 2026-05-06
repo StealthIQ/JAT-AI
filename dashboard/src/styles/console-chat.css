@@ -424,6 +424,58 @@
   color: #8a9ab0;
 }
 
+.chat-plan-tasks {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin: 0.5rem 0;
+}
+
+.chat-plan-task {
+  background: #0d1117;
+  border: 1px solid #2b2f36;
+  border-radius: 6px;
+  padding: 0.5rem 0.7rem;
+}
+
+.chat-plan-task-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.3rem;
+}
+
+.chat-plan-task-id {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--accent-primary);
+}
+
+.chat-plan-task-branch {
+  font-size: 0.6rem;
+  color: #5a6a7e;
+  font-family: var(--font-mono, monospace);
+}
+
+.chat-plan-task-desc {
+  font-size: 0.72rem;
+  color: #c8d0da;
+  margin-bottom: 0.2rem;
+}
+
+.chat-plan-task-criteria {
+  font-size: 0.65rem;
+  color: #25d366;
+  padding-top: 0.2rem;
+  border-top: 1px solid #1c2430;
+}
+
+.chat-plan-task-deps {
+  font-size: 0.6rem;
+  color: #6b7a90;
+  margin-top: 0.15rem;
+}
+
 .chat-input-bar {
   display: flex;
   gap: 0.5rem;
