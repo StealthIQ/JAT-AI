@@ -1,26 +1,58 @@
 @echo off
-:: Adds "jat" command to your system PATH so you can run it from anywhere.
-:: Run this once as Administrator.
+title JAT-AI Installer
+echo.
+echo  ========================================
+echo   JAT-AI - Installing...
+echo  ========================================
+echo.
 
 set SCRIPT_DIR=%~dp0
-set TARGET=%USERPROFILE%\jat.cmd
+set ROOT=%SCRIPT_DIR%..
 
+:: Step 1: Install Python dependencies
+echo [1/3] Installing Python dependencies...
+pip install --quiet --progress-bar on -e "%ROOT%"
+if %ERRORLEVEL% NEQ 0 (
+    echo [WARN] pip failed, trying pip3...
+    pip3 install --quiet --progress-bar on -e "%ROOT%"
+)
+if %ERRORLEVEL% NEQ 0 (
+    echo [ERROR] Could not install dependencies. Make sure Python and pip are on PATH.
+    pause
+    exit /b 1
+)
+echo [OK] Python dependencies installed.
+
+:: Step 2: Install frontend dependencies
+echo [2/3] Checking frontend dependencies...
+if not exist "%ROOT%\dashboard\node_modules" (
+    echo       Installing npm packages...
+    cd /d "%ROOT%\dashboard"
+    npm install --silent
+    echo [OK] Frontend dependencies installed.
+) else (
+    echo [OK] Frontend already installed.
+)
+
+:: Step 3: Setup jat command and PATH
+echo [3/3] Setting up jat command...
+set TARGET=%USERPROFILE%\jat.cmd
 echo @echo off > "%TARGET%"
 echo call "%SCRIPT_DIR%jat.bat" %%* >> "%TARGET%"
 
-:: Add user profile to PATH if not already there
 echo %PATH% | findstr /i "%USERPROFILE%" >nul
-if errorlevel 1 (
+if %ERRORLEVEL% NEQ 0 (
     setx PATH "%PATH%;%USERPROFILE%"
     echo [OK] Added %USERPROFILE% to PATH.
 ) else (
-    echo [OK] %USERPROFILE% already in PATH.
+    echo [OK] PATH already configured.
 )
 
-:: Install Python dependencies including chromadb
-pip install -e . >nul 2>&1
-echo [OK] Python dependencies installed.
-echo [NOTE] First run may download embedding models (~100MB).
-
-echo [OK] "jat" command installed. Open a new terminal and type: jat
+echo.
+echo  ========================================
+echo   JAT-AI installed successfully!
+echo   First run may download embedding models (~100MB).
+echo   Open a new terminal and type: jat
+echo  ========================================
+echo.
 pause
