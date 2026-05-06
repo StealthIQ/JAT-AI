@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import re
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from config import load_settings
+from core.rag_store import query_context, store_context
 from db import db
 
 router = APIRouter()
@@ -161,6 +164,16 @@ class ModelNotAvailableError(Exception):
 
 REPOMIX_TRIGGERS = {"rrpo", "repomix", "/repomix", "/rrpo", "rerepomix", "repomix-r", "r-repomix", "rmx"}
 
+THINK_INSTRUCTION = """
+
+<thinking>
+You may use <think>...</think> blocks for internal reasoning. Content inside think blocks will not be shown to the user but helps you work through complex problems step by step.
+</thinking>
+
+<context_saving>
+If you discover important information worth remembering across conversations, append [ACTION:SAVE_CONTEXT:content here] at the end of your response. This saves the content to long-term memory for this repo.
+</context_saving>"""
+
 
 def _is_repomix_trigger(messages: list) -> bool:
     if not messages:
@@ -179,6 +192,22 @@ async def _inject_available_skills(system: str) -> str:
         return system + f"\n\n<available_skills>\nAssign these via prompt_id in your plan. The orchestrator will inject the full prompt content into each Jules session.\n{skills_list}\n</available_skills>"
     except Exception:
         return system
+
+
+_SAVE_CONTEXT_PATTERN = re.compile(r"\[ACTION:SAVE_CONTEXT:(.*?)\]", re.DOTALL)
+
+
+async def _handle_save_context(repo: str | None, response: str) -> None:
+    if not repo:
+        return
+    matches = _SAVE_CONTEXT_PATTERN.findall(response)
+    if not matches:
+        return
+    parts = repo.split("/", 1)
+    if len(parts) != 2:
+        return
+    for content in matches:
+        await store_context(parts[0], parts[1], content.strip(), metadata={"type": "ai_saved"})
 
 
 @router.post("/api/chat/send")
@@ -202,9 +231,19 @@ async def chat_send(request: ChatRequest):
     messages = _build_messages(request)
     system = request.system or MODE_SYSTEM_PROMPTS.get(request.mode, "")
 
-    # In plan/auto mode, inject available skills so the AI can assign them to tasks
     if request.mode in ("plan", "auto") and not request.system:
         system = await _inject_available_skills(system)
+
+    if request.repo and request.messages:
+        parts = request.repo.split("/", 1)
+        if len(parts) == 2:
+            user_query = request.messages[-1].content
+            rag_chunks = await query_context(parts[0], parts[1], user_query, n_results=5)
+            if rag_chunks:
+                rag_block = "\n---\n".join(rag_chunks)
+                system += f"\n\n<relevant_context>\n{rag_block}\n</relevant_context>"
+
+    system += THINK_INSTRUCTION
 
     last_error = ""
 
@@ -219,6 +258,7 @@ async def chat_send(request: ChatRequest):
                 messages=messages,
                 system=system,
             )
+            await _handle_save_context(request.repo, response)
             return ChatResponse(
                 response=response,
                 provider_id=provider_id,

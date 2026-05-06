@@ -17,5 +17,10 @@ if errorlevel 1 (
     echo [OK] %USERPROFILE% already in PATH.
 )
 
-echo [OK] "jat" command installed. Open a new terminal and type: jai
+:: Install Python dependencies including chromadb
+pip install -e . >nul 2>&1
+echo [OK] Python dependencies installed.
+echo [NOTE] First run may download embedding models (~100MB).
+
+echo [OK] "jat" command installed. Open a new terminal and type: jat
 pause

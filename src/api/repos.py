@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 
 from config import load_settings
+from core.rag_store import get_chunk_count, ingest_repomix_xml
 from core.repomix import analyze_repo, get_cached_xml
 
 router = APIRouter()
@@ -50,3 +51,18 @@ async def init_jdocs_endpoint(owner: str, repo: str, branch: str = "main"):
     from core.jdocs import init_jdocs
     results = await init_jdocs(owner, repo, branch, token)
     return {"results": results}
+
+
+@router.post("/api/repos/{owner}/{repo}/ingest")
+async def ingest_repo(owner: str, repo: str):
+    xml = get_cached_xml(owner, repo)
+    if not xml:
+        raise HTTPException(404, "No cached analysis found. Run analyze first.")
+    count = await ingest_repomix_xml(owner, repo, xml)
+    return {"chunks": count, "status": "ingested"}
+
+
+@router.get("/api/repos/{owner}/{repo}/rag-status")
+async def rag_status(owner: str, repo: str):
+    count = get_chunk_count(owner, repo)
+    return {"ingested": count > 0, "chunks": count}

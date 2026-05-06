@@ -13,5 +13,11 @@ else
     sudo ln -sf "$SCRIPT_DIR/jat.sh" "$LINK_PATH"
 fi
 
-chmod +x "$SCRIPT_DIR/jai.sh"
-echo "[OK] 'jai' command installed. Type: jat"
+chmod +x "$SCRIPT_DIR/jat.sh"
+
+# Install Python dependencies including chromadb
+pip install -e . 2>/dev/null || pip3 install -e . 2>/dev/null
+echo "[OK] Python dependencies installed."
+echo "[NOTE] First run may download embedding models (~100MB)."
+
+echo "[OK] 'jat' command installed. Type: jat"
