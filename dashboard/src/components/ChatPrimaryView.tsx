@@ -73,6 +73,28 @@ export const ChatPrimaryView = () => {
   useEffect(() => { fetchConversations(); }, [fetchConversations]);
 
   useEffect(() => {
+    if (!activeConvId) return;
+    const conv = conversations.find((c) => c.id === activeConvId);
+    if (conv && conv.messages.length > 0) return;
+    fetch(`/api/conversations/${activeConvId}/messages`)
+      .then((r) => r.json())
+      .then((d) => {
+        const msgs: Message[] = (d.messages ?? []).map((m: any) => ({
+          id: m.id ?? `m-${Date.now()}-${Math.random()}`,
+          role: m.role,
+          content: m.content,
+          timestamp: m.created_at ?? m.timestamp ?? new Date().toISOString(),
+          model: m.model,
+        }));
+        if (msgs.length > 0) {
+          setConversations((prev) => prev.map((c) => c.id === activeConvId ? { ...c, messages: msgs } : c));
+          setIsStarted(true);
+        }
+      })
+      .catch(() => {});
+  }, [activeConvId]);
+
+  useEffect(() => {
     fetch("/api/providers").then((r) => r.json()).then((d) => {
       const enabled = (d.providers ?? []).filter((p: any) => p.enabled);
       const grouped: Record<string, ProviderGroup> = {};
@@ -181,7 +203,7 @@ export const ChatPrimaryView = () => {
           body: JSON.stringify({
             provider_type: selectedProviderType, model: selectedModel,
             messages: [{ role: "user", content: "Analyze this repo and give me a structured summary: project name, tech stack, structure, and what it does." }],
-            system: `Analyze this codebase and provide a structured summary:\n\n${data.xml.slice(0, 80000)}`,
+            system: `You are a code analyst. Respond directly without preamble like "Based on the provided..." or "Here is a summary...". Start with the actual content.\n\nAnalyze this codebase and provide a structured summary:\n\n${data.xml.slice(0, 80000)}`,
             repo: `iceyxsm/${selectedRepo}`,
           }),
         });
@@ -196,8 +218,14 @@ export const ChatPrimaryView = () => {
       .then((data) => {
         if (data?.response) {
           const msg: Message = { id: `m-${Date.now()}`, role: "assistant", content: data.response, timestamp: new Date().toISOString(), model: selectedModel };
-          setConversations((prev) => prev.map((c) => c.id === activeConvId ? { ...c, messages: [...c.messages, msg] } : c));
+          setConversations((prev) => prev.map((c) => c.id === activeConvId
+            ? { ...c, messages: [...c.messages, msg], model: selectedModel, title: selectedRepo }
+            : c));
           setIsStarted(true);
+          fetch(`/api/conversations/${activeConvId}`, {
+            method: "PATCH", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ title: selectedRepo, model: selectedModel }),
+          }).catch(() => {});
         }
       })
       .catch((e) => {
@@ -212,12 +240,22 @@ export const ChatPrimaryView = () => {
   }, [selectedRepo, selectedProviderType, selectedModel, activeConvId]);
 
   const handleNewConversation = useCallback(() => {
-    const newConv: Conversation = { id: `conv-${Date.now()}`, title: "New conversation", messages: [], createdAt: new Date().toISOString() };
-    setConversations((prev) => [newConv, ...prev]);
-    setActiveConvId(newConv.id);
+    const body = { title: "New conversation", mode, repo_owner: "iceyxsm", repo_name: selectedRepo, provider_type: selectedProviderType, model: selectedModel };
+    fetch("/api/conversations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+      .then((r) => r.json())
+      .then((data) => {
+        const newConv: Conversation = { id: data.id, title: body.title, messages: [], createdAt: new Date().toISOString(), model: selectedModel };
+        setConversations((prev) => [newConv, ...prev]);
+        setActiveConvId(data.id);
+      })
+      .catch(() => {
+        const newConv: Conversation = { id: `conv-${Date.now()}`, title: "New conversation", messages: [], createdAt: new Date().toISOString(), model: selectedModel };
+        setConversations((prev) => [newConv, ...prev]);
+        setActiveConvId(newConv.id);
+      });
     setIsStarted(false);
     exec.resetExecution();
-  }, [exec]);
+  }, [exec, selectedModel, selectedProviderType, selectedRepo, mode]);
 
   const handleImageChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -234,6 +272,22 @@ export const ChatPrimaryView = () => {
   }));
   const modelItems = models.map((m) => ({ id: m.id, label: m.name }));
   const repoItems = repos.map((r) => ({ id: r, label: r }));
+  const parseMessageActions = (content: string) => {
+    const actionMatch = content.match(/\[ACTION:(\w+)(?::([^\]]*))?\]/);
+    if (!actionMatch) return { text: content, action: null };
+    const text = content.replace(/\[ACTION:\w+(?::[^\]]*)?\]/, "").trim();
+    return { text, action: { type: actionMatch[1], payload: actionMatch[2] ?? "" } };
+  };
+
+  const handleAction = (actionType: string, payload: string) => {
+    if (actionType === "SWITCH_MODE") {
+      const newMode = payload.toLowerCase() as "ask" | "plan" | "build" | "auto";
+      if (["ask", "plan", "build", "auto"].includes(newMode)) setMode(newMode);
+    } else if (actionType === "APPROVE_PLAN") {
+      exec.handleApprove();
+    }
+  };
+
   const showTasks = (mode === "plan" || mode === "build" || mode === "auto") && tasks.length > 0;
   const hasExistingMessages = (activeConv?.messages.length ?? 0) > 0;
   const chatEnabled = isStarted || hasExistingMessages;
@@ -261,7 +315,7 @@ export const ChatPrimaryView = () => {
           {conversations.filter((c) => c.title.toLowerCase().includes(chatSearch.toLowerCase())).map((c) => (
             <button key={c.id} type="button" className={`chat-conv-item${activeConvId === c.id ? " is-active" : ""}`} onClick={() => setActiveConvId(c.id)}>
               <span className="chat-conv-title">{c.title}</span>
-              <span className="chat-conv-meta">{c.model ?? "no model"}</span>
+              <span className="chat-conv-meta">{c.model ? c.model.split("/").pop() : "no model"}</span>
             </button>
           ))}
         </div>
@@ -318,12 +372,22 @@ export const ChatPrimaryView = () => {
                     <span className="chat-setup-text">Select a repo and click Start to begin</span>
                   </div>
                 )}
-                {activeConv.messages.map((msg) => (
-                  <div key={msg.id} className={`chat-msg chat-msg--${msg.role}`}>
-                    <span className="chat-msg-role">{msg.role === "user" ? "You" : msg.model ?? "AI"}</span>
-                    <div className="chat-msg-content">{msg.content}</div>
-                  </div>
-                ))}
+                {activeConv.messages.map((msg) => {
+                  const { text, action } = msg.role === "assistant" ? parseMessageActions(msg.content) : { text: msg.content, action: null };
+                  return (
+                    <div key={msg.id} className={`chat-msg chat-msg--${msg.role}`}>
+                      <span className="chat-msg-role">{msg.role === "user" ? "You" : msg.model ?? "AI"}</span>
+                      <div className="chat-msg-content">{text}</div>
+                      {action && (
+                        <button type="button" className="chat-action-btn" onClick={() => handleAction(action.type, action.payload)}>
+                          {action.type === "SWITCH_MODE" && `Switch to ${action.payload.toUpperCase()} mode`}
+                          {action.type === "APPROVE_PLAN" && "Approve Plan"}
+                          {action.type === "APPROVE_BUILD" && "Approve Build"}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
                 {isTyping && (
                   <div className="chat-msg chat-msg--assistant">
                     <span className="chat-msg-role">AI</span>
