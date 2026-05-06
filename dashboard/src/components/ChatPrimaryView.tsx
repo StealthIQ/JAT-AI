@@ -74,6 +74,8 @@ export const ChatPrimaryView = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [usage, setUsage] = useState({ tokensUsed: 0, tokensLimit: 0, rpmLimit: 40, requestsToday: 0 });
   const [chatSearch, setChatSearch] = useState("");
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteInput, setDeleteInput] = useState("");
 
   const tasks = useLiveTaskStatus();
   const activeConv = conversations.find((c) => c.id === activeConvId) ?? null;
@@ -386,6 +388,28 @@ export const ChatPrimaryView = () => {
                   <span className="chat-usage-value">{usage.requestsToday}/{usage.rpmLimit}</span>
                 </div>
               </div>
+              <button type="button" className="chat-delete-btn" onClick={() => setShowDeleteConfirm(true)}>Delete</button>
+              {showDeleteConfirm && (
+                <div className="chat-delete-popup">
+                  <div className="chat-delete-popup-inner">
+                    <p>Type <strong>delete chat</strong> to confirm deletion</p>
+                    <input type="text" value={deleteInput} onChange={(e) => setDeleteInput(e.target.value)} placeholder="delete chat" autoFocus />
+                    <div className="chat-delete-popup-actions">
+                      <button type="button" onClick={() => { setShowDeleteConfirm(false); setDeleteInput(""); }}>Cancel</button>
+                      <button type="button" className="chat-delete-confirm-btn" disabled={deleteInput !== "delete chat"} onClick={() => {
+                        if (!activeConvId) return;
+                        fetch(`/api/conversations/${activeConvId}`, { method: "DELETE" }).catch(() => {});
+                        setConversations((prev) => prev.filter((c) => c.id !== activeConvId));
+                        const remaining = conversations.filter((c) => c.id !== activeConvId);
+                        setActiveConvId(remaining.length > 0 ? remaining[0].id : null);
+                        setShowDeleteConfirm(false);
+                        setDeleteInput("");
+                        setIsStarted(false);
+                      }}>Delete</button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </header>
             <div className="chat-body-row">
               <div className="chat-messages">
