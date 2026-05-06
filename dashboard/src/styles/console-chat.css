@@ -388,6 +388,10 @@
 
 .chat-md td { background: #11161d; }
 
+.chat-md td p, .chat-md th p {
+  margin: 0;
+}
+
 .chat-md hr {
   border: none;
   border-top: 1px solid #2b2f36;
