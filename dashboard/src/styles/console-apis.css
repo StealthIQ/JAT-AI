@@ -589,6 +589,11 @@
   overflow-y: auto;
 }
 
+.apis-test-response--error {
+  color: #f87171;
+  border-color: #7f1d1d;
+}
+
 .apis-mode-toggle {
   display: flex;
   gap: 0;

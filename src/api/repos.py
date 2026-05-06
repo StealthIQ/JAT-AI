@@ -10,20 +10,25 @@ settings = load_settings()
 
 
 @router.post("/api/repos/{owner}/{repo}/analyze")
-async def analyze(owner: str, repo: str, force: bool = False):
+async def analyze(owner: str, repo: str):
     token = settings.github_token
     if not token:
         raise HTTPException(400, "No GitHub token configured")
 
-    if not force:
-        cached = get_cached_xml(owner, repo)
-        if cached:
-            return {"xml": cached, "cached": True, "chars": len(cached)}
-
     try:
         xml = await analyze_repo(owner, repo, token)
     except RuntimeError as e:
-        raise HTTPException(500, str(e))
+        import traceback
+        traceback.print_exc()
+        msg = str(e) or "Unknown runtime error (empty message)"
+        print(f"[analyze] RuntimeError: {msg}")
+        raise HTTPException(500, f"Analysis failed: {msg}")
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        msg = f"{type(e).__name__}: {e}" or "Unknown error"
+        print(f"[analyze] Exception: {msg}")
+        raise HTTPException(500, f"Unexpected error: {msg}")
 
     return {"xml": xml, "cached": False, "chars": len(xml)}
 

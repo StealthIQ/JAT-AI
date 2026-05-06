@@ -132,6 +132,8 @@ async def _call_openai_compat(api_key: str, provider_type: str, model: str, mess
 
     if res.status_code == 429:
         raise RateLimitError(provider_type)
+    if res.status_code == 404:
+        raise ModelNotAvailableError(f"Model '{model}' is not available on {provider_type}. Try a different model.")
     if res.status_code != 200:
         raise ProviderError(f"{provider_type} API {res.status_code}: {res.text[:200]}")
 
@@ -153,7 +155,11 @@ class ProviderError(Exception):
     pass
 
 
-REPOMIX_TRIGGERS = {"rrpo", "repomix", "/repomix", "/rrpo"}
+class ModelNotAvailableError(Exception):
+    pass
+
+
+REPOMIX_TRIGGERS = {"rrpo", "repomix", "/repomix", "/rrpo", "rerepomix", "repomix-r", "r-repomix", "rmx"}
 
 
 def _is_repomix_trigger(messages: list) -> bool:
@@ -218,6 +224,8 @@ async def chat_send(request: ChatRequest):
                 provider_id=provider_id,
                 model=request.model,
             )
+        except ModelNotAvailableError as e:
+            raise HTTPException(404, str(e))
         except RateLimitError:
             last_error = f"Rate limited on key {key_row.get('name', provider_id)}, trying next..."
             continue

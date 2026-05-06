@@ -1,10 +1,48 @@
 from __future__ import annotations
 
 import asyncio
+import shutil
 from pathlib import Path
 
 REPOS_DIR = Path("data/repos")
 REPOMIX_DIR = Path("data/repomix")
+
+_deps_ready = False
+
+
+async def _run(cmd: str, cwd: str | None = None, timeout: int = 300) -> tuple[int, str, str]:
+    proc = await asyncio.create_subprocess_shell(
+        cmd,
+        cwd=cwd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    try:
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+    except asyncio.TimeoutError:
+        proc.kill()
+        return 1, "", f"Command timed out after {timeout}s: {cmd[:80]}"
+    out = stdout.decode(errors="replace")
+    err = stderr.decode(errors="replace")
+    if proc.returncode and proc.returncode != 0:
+        combined = (err or out).strip()
+        print(f"[repomix] CMD FAILED: {cmd}\n  rc={proc.returncode}\n  stdout={out[:200]}\n  stderr={err[:200]}")
+        return proc.returncode, out, combined or f"Command exited with code {proc.returncode}"
+    return 0, out, err
+
+
+async def ensure_dependencies() -> None:
+    global _deps_ready
+    if _deps_ready:
+        return
+
+    if not shutil.which("git"):
+        raise RuntimeError("git is not installed. Please install git and add it to PATH.")
+
+    if not shutil.which("npx"):
+        raise RuntimeError("Node.js/npx is not installed. Please install Node.js and add it to PATH.")
+
+    _deps_ready = True
 
 
 async def clone_or_pull(owner: str, repo: str, token: str) -> Path:
@@ -12,24 +50,16 @@ async def clone_or_pull(owner: str, repo: str, token: str) -> Path:
     repo_path.parent.mkdir(parents=True, exist_ok=True)
 
     if (repo_path / ".git").exists():
-        proc = await asyncio.create_subprocess_exec(
-            "git", "pull", "--ff-only",
-            cwd=str(repo_path),
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        await proc.wait()
+        rc, _, stderr = await _run("git pull --ff-only", cwd=str(repo_path))
+        if rc != 0:
+            raise RuntimeError(f"git pull failed (rc={rc}): {stderr[:200]}")
     else:
         url = f"https://{token}@github.com/{owner}/{repo}.git"
-        proc = await asyncio.create_subprocess_exec(
-            "git", "clone", "--depth", "1", url, str(repo_path),
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        await proc.wait()
-        if proc.returncode != 0:
-            stderr = await proc.stderr.read() if proc.stderr else b""
-            raise RuntimeError(f"git clone failed: {stderr.decode()[:200]}")
+        # -c credential.helper= disables Git Credential Manager popup on Windows
+        rc, _, stderr = await _run(f'git -c credential.helper= clone --depth 1 "{url}" "{repo_path}"')
+        if rc != 0:
+            safe_err = stderr.replace(token, "***")[:200]
+            raise RuntimeError(f"git clone failed (rc={rc}): {safe_err}")
 
     return repo_path
 
@@ -37,30 +67,31 @@ async def clone_or_pull(owner: str, repo: str, token: str) -> Path:
 async def run_repomix(repo_path: Path, owner: str, repo: str) -> str:
     REPOMIX_DIR.mkdir(parents=True, exist_ok=True)
     output_path = REPOMIX_DIR / f"{owner}__{repo}.xml"
+    abs_output = output_path.resolve()
 
-    proc = await asyncio.create_subprocess_exec(
-        "npx", "repomix", "--output", str(output_path),
+    rc, _, stderr = await _run(
+        f'npx --yes repomix --output "{abs_output}"',
         cwd=str(repo_path),
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
     )
-    await proc.wait()
 
-    if proc.returncode != 0:
-        stderr = await proc.stderr.read() if proc.stderr else b""
-        raise RuntimeError(f"repomix failed: {stderr.decode()[:300]}")
+    if rc != 0:
+        raise RuntimeError(f"repomix failed (rc={rc}): {stderr[:300]}")
 
-    return output_path.read_text(encoding="utf-8", errors="replace")
+    if not abs_output.exists():
+        raise RuntimeError(f"repomix produced no output file at {abs_output}")
+
+    return abs_output.read_text(encoding="utf-8", errors="replace")
 
 
 async def analyze_repo(owner: str, repo: str, token: str) -> str:
+    await ensure_dependencies()
     repo_path = await clone_or_pull(owner, repo, token)
     xml = await run_repomix(repo_path, owner, repo)
     return xml
 
 
 def get_cached_xml(owner: str, repo: str) -> str | None:
-    output_path = REPOMIX_DIR / f"{owner}__{repo}.xml"
+    output_path = (REPOMIX_DIR / f"{owner}__{repo}.xml").resolve()
     if output_path.exists():
         return output_path.read_text(encoding="utf-8", errors="replace")
     return None

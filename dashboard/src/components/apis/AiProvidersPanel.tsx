@@ -14,7 +14,7 @@ const PROVIDER_TYPES = [
   "sambanova", "fireworks", "nebius", "hyperbolic", "scaleway", "longcat",
 ];
 
-const ProviderTypeDropdown = ({ value, onChange }: { value: string; onChange: (v: string) => void }) => {
+const ProviderTypeDropdown = ({ value, onChange, onSelected }: { value: string; onChange: (v: string) => void; onSelected?: () => void }) => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const ref = useRef<HTMLDivElement>(null);
@@ -29,6 +29,13 @@ const ProviderTypeDropdown = ({ value, onChange }: { value: string; onChange: (v
 
   const filtered = PROVIDER_TYPES.filter((t) => t.includes(search.toLowerCase()));
 
+  const selectItem = (t: string) => {
+    onChange(t);
+    setOpen(false);
+    setSearch("");
+    onSelected?.();
+  };
+
   return (
     <div className="apis-custom-dropdown" ref={ref}>
       <button type="button" className="apis-custom-dropdown-trigger" onClick={() => setOpen(!open)}>
@@ -37,10 +44,22 @@ const ProviderTypeDropdown = ({ value, onChange }: { value: string; onChange: (v
       </button>
       {open && (
         <div className="apis-custom-dropdown-panel">
-          <input className="apis-custom-dropdown-search" type="text" placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} autoFocus />
+          <input
+            className="apis-custom-dropdown-search"
+            type="text"
+            placeholder="Search..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && filtered.length > 0) {
+                selectItem(filtered[0]);
+              }
+            }}
+            autoFocus
+          />
           <div className="apis-custom-dropdown-list">
             {filtered.map((t) => (
-              <button key={t} type="button" className={`apis-custom-dropdown-item${t === value ? " is-active" : ""}`} onClick={() => { onChange(t); setOpen(false); setSearch(""); }}>
+              <button key={t} type="button" className={`apis-custom-dropdown-item${t === value ? " is-active" : ""}`} onClick={() => selectItem(t)}>
                 {t.toUpperCase()}
               </button>
             ))}
@@ -95,7 +114,7 @@ const TestProviderPopup = (props: TestPopupProps) => {
             <label>Message</label>
             <input type="text" value={props.input} onChange={(e) => props.onInputChange(e.target.value)} placeholder="Say hello..." onKeyDown={(e) => { if (e.key === "Enter" && props.input) props.onSend(); }} />
           </div>
-          {props.response && <pre className="apis-test-response">{props.response}</pre>}
+          {props.response && <pre className={`apis-test-response${props.response.includes("not available") || props.response.includes("Error") || props.response.includes("failed") ? " apis-test-response--error" : ""}`}>{props.response}</pre>}
         </div>
         <footer className="apis-popup-footer">
           <button type="button" onClick={props.onClose}>Close</button>
@@ -116,8 +135,12 @@ export const AiProvidersPanel = ({ onAddRef }: { onAddRef: React.MutableRefObjec
   const [formKey, setFormKey] = useState("");
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
+  const keyInputRef = useRef<HTMLInputElement>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [confirmInput, setConfirmInput] = useState("");
+  const [confirmToggleId, setConfirmToggleId] = useState<string | null>(null);
+  const [confirmToggleEnabled, setConfirmToggleEnabled] = useState(false);
+  const [toggleInput, setToggleInput] = useState("");
   const [testProviderId, setTestProviderId] = useState<string | null>(null);
   const [testModels, setTestModels] = useState<{ id: string; name: string }[]>([]);
   const [testModel, setTestModel] = useState("");
@@ -199,7 +222,7 @@ export const AiProvidersPanel = ({ onAddRef }: { onAddRef: React.MutableRefObjec
             <div className="apis-card-actions">
               <button type="button" onClick={() => { fetch(`/api/providers/${p.id}/docs`).then((r) => r.json()).then((d) => { if (d.url) window.open(d.url, "_blank"); }); }}>Docs</button>
               <button type="button" onClick={() => { setTestProviderId(p.id); }}>Test</button>
-              <button type="button" onClick={() => void handleToggle(p.id, p.enabled)}>
+              <button type="button" onClick={() => { setConfirmToggleId(p.id); setConfirmToggleEnabled(p.enabled); }}>
                 {p.enabled ? "Disable" : "Enable"}
               </button>
               <button type="button" className="apis-card-delete" onClick={() => setConfirmDeleteId(p.id)}>Remove</button>
@@ -215,15 +238,15 @@ export const AiProvidersPanel = ({ onAddRef }: { onAddRef: React.MutableRefObjec
             <div className="apis-popup-body">
               <div className="apis-field">
                 <label>Provider Type</label>
-                <ProviderTypeDropdown value={formType} onChange={(v) => { setFormType(v); setFormName(getNextName(v)); }} />
+                <ProviderTypeDropdown value={formType} onChange={(v) => { setFormType(v); setFormName(getNextName(v)); }} onSelected={() => keyInputRef.current?.focus()} />
               </div>
               <div className="apis-field">
                 <label>Name</label>
-                <input type="text" value={formName} onChange={(e) => setFormName(e.target.value)} />
+                <input type="text" value={formName} onChange={(e) => setFormName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") keyInputRef.current?.focus(); }} />
               </div>
               <div className="apis-field">
                 <label>API Key</label>
-                <input type="password" value={formKey} onChange={(e) => setFormKey(e.target.value)} placeholder="Enter key..." />
+                <input ref={keyInputRef} type="password" value={formKey} onChange={(e) => setFormKey(e.target.value)} placeholder="Enter key..." onKeyDown={(e) => { if (e.key === "Enter" && formName && formKey) void handleAdd(); }} />
               </div>
             </div>
             <footer className="apis-popup-footer">
@@ -247,6 +270,22 @@ export const AiProvidersPanel = ({ onAddRef }: { onAddRef: React.MutableRefObjec
             <footer className="apis-popup-footer">
               <button type="button" className="apis-popup-cancel" onClick={() => { setConfirmDeleteId(null); setConfirmInput(""); }}>Cancel</button>
               <button type="button" className="apis-submit-btn apis-submit-btn--danger" disabled={confirmInput !== "confirm"} onClick={() => void handleDelete(confirmDeleteId)}>Remove</button>
+            </footer>
+          </div>
+        </div>
+      )}
+
+      {confirmToggleId && (
+        <div className="apis-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) { setConfirmToggleId(null); setToggleInput(""); } }}>
+          <div className="apis-popup apis-popup--narrow">
+            <header className="apis-popup-header"><h3>{confirmToggleEnabled ? "Disable" : "Enable"} Provider</h3></header>
+            <div className="apis-popup-body">
+              <p className="apis-confirm-text">Type "confirm" to {confirmToggleEnabled ? "disable" : "enable"} this provider.</p>
+              <input className="apis-confirm-input" type="text" value={toggleInput} onChange={(e) => setToggleInput(e.target.value)} placeholder="confirm" />
+            </div>
+            <footer className="apis-popup-footer">
+              <button type="button" className="apis-popup-cancel" onClick={() => { setConfirmToggleId(null); setToggleInput(""); }}>Cancel</button>
+              <button type="button" className="apis-submit-btn" disabled={toggleInput !== "confirm"} onClick={() => { void handleToggle(confirmToggleId, confirmToggleEnabled); setConfirmToggleId(null); setToggleInput(""); }}>Confirm</button>
             </footer>
           </div>
         </div>

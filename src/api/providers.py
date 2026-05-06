@@ -199,4 +199,7 @@ async def test_provider_chat(provider_id: str, body: TestChatRequest):
         return {"response": response}
     except Exception as exc:
         await pool.close()
+        err_str = str(exc)
+        if "404" in err_str or "Not Found" in err_str:
+            return {"error": f"Model '{body.model}' is not available. Try a different model."}
         raise HTTPException(500, f"Test failed: {exc}")

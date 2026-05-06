@@ -261,6 +261,8 @@
 
 .chat-model-dropdown {
   position: relative;
+  width: 130px;
+  flex-shrink: 0;
 }
 
 .chat-model-dropdown-trigger {
@@ -275,7 +277,7 @@
   font-family: var(--font-main);
   font-size: 0.72rem;
   cursor: pointer;
-  max-width: 240px;
+  width: 100%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

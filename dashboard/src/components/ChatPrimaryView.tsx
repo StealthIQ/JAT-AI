@@ -23,6 +23,13 @@ type Conversation = {
 
 type ProviderGroup = { type: string; keyCount: number; ids: string[] };
 
+class ModelUnavailableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ModelUnavailableError";
+  }
+}
+
 export const ChatPrimaryView = () => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
@@ -132,7 +139,12 @@ export const ChatPrimaryView = () => {
         repo: selectedRepo ? `iceyxsm/${selectedRepo}` : undefined, mode,
       }),
     })
-      .then((r) => r.json())
+      .then((r) => {
+        if (r.status === 404) {
+          return r.json().then((d: any) => { throw new ModelUnavailableError(d.detail ?? "Model not available"); });
+        }
+        return r.json();
+      })
       .then((data) => {
         const content = data.response ?? data.detail ?? "No response";
         const assistantMsg: Message = { id: `m-${Date.now() + 1}`, role: "assistant", content, timestamp: new Date().toISOString(), model: selectedModel };
@@ -146,8 +158,12 @@ export const ChatPrimaryView = () => {
           body: JSON.stringify({ role: "assistant", content }),
         }).catch(() => {});
       })
-      .catch(() => {
-        const errMsg: Message = { id: `m-${Date.now() + 1}`, role: "assistant", content: "Failed to get response. Check backend.", timestamp: new Date().toISOString() };
+      .catch((e) => {
+        const isModelError = e instanceof ModelUnavailableError;
+        const content = isModelError
+          ? `${e.message}\n\nPlease select a different model from the dropdown above.`
+          : "Failed to get response. Check backend.";
+        const errMsg: Message = { id: `m-${Date.now() + 1}`, role: "assistant", content, timestamp: new Date().toISOString() };
         setConversations((prev) => prev.map((c) => c.id === activeConvId ? { ...c, messages: [...c.messages, errMsg] } : c));
       })
       .finally(() => { setIsTyping(false); setImagePreview(null); });
@@ -170,7 +186,13 @@ export const ChatPrimaryView = () => {
           }),
         });
       })
-      .then((r) => r?.json())
+      .then((r) => {
+        if (!r) return null;
+        if (r.status === 404) {
+          return r.json().then((d: any) => { throw new ModelUnavailableError(d.detail ?? "Model not available"); });
+        }
+        return r.json();
+      })
       .then((data) => {
         if (data?.response) {
           const msg: Message = { id: `m-${Date.now()}`, role: "assistant", content: data.response, timestamp: new Date().toISOString(), model: selectedModel };
@@ -179,7 +201,11 @@ export const ChatPrimaryView = () => {
         }
       })
       .catch((e) => {
-        const errMsg: Message = { id: `m-${Date.now()}`, role: "assistant", content: `Start failed: ${e.message}`, timestamp: new Date().toISOString() };
+        const isModelError = e instanceof ModelUnavailableError;
+        const content = isModelError
+          ? `${e.message}\n\nPlease select a different model from the dropdown above and click Start again.`
+          : `Start failed: ${e.message}`;
+        const errMsg: Message = { id: `m-${Date.now()}`, role: "assistant", content, timestamp: new Date().toISOString() };
         setConversations((prev) => prev.map((c) => c.id === activeConvId ? { ...c, messages: [...c.messages, errMsg] } : c));
       })
       .finally(() => setIsAnalyzing(false));

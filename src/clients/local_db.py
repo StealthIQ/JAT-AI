@@ -26,6 +26,7 @@ class LocalDB:
                 name TEXT NOT NULL UNIQUE,
                 api_key_encrypted TEXT NOT NULL,
                 plan TEXT DEFAULT 'free',
+                plan_tier TEXT DEFAULT 'free',
                 enabled INTEGER DEFAULT 1,
                 daily_limit INTEGER DEFAULT 0,
                 sessions_today INTEGER DEFAULT 0,
