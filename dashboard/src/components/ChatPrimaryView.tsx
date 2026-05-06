@@ -7,6 +7,25 @@ import { useExecutionActions } from "./chat/useExecutionActions";
 
 marked.setOptions({ breaks: true, gfm: true });
 
+function wrapSectionsCollapsible(html: string): string {
+  const lines = html.split("\n");
+  const result: string[] = [];
+  let inSection = false;
+
+  for (const line of lines) {
+    const headerMatch = line.match(/^<h([23])[^>]*>(.*?)<\/h[23]>/);
+    if (headerMatch) {
+      if (inSection) result.push("</details>");
+      result.push(`<details><summary>${headerMatch[2]}</summary>`);
+      inSection = true;
+    } else {
+      result.push(line);
+    }
+  }
+  if (inSection) result.push("</details>");
+  return result.join("\n");
+}
+
 type Message = {
   id: string;
   role: "user" | "assistant";
@@ -377,7 +396,7 @@ export const ChatPrimaryView = () => {
                 )}
                 {activeConv.messages.map((msg) => {
                   const { text, action } = msg.role === "assistant" ? parseMessageActions(msg.content) : { text: msg.content, action: null };
-                  const rendered = msg.role === "assistant" ? marked.parse(text) as string : text;
+                  const rendered = msg.role === "assistant" ? wrapSectionsCollapsible(marked.parse(text) as string) : text;
                   return (
                     <div key={msg.id} className={`chat-msg chat-msg--${msg.role}`}>
                       <span className="chat-msg-role">{msg.role === "user" ? "You" : msg.model ?? "AI"}</span>
