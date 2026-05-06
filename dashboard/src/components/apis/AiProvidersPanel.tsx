@@ -11,7 +11,7 @@ type Provider = {
 const PROVIDER_TYPES = [
   "groq", "google", "cloudflare", "openrouter", "ollama", "cerebras",
   "cohere", "mistral", "nvidia_nim", "github_models", "huggingface",
-  "sambanova", "fireworks", "nebius", "hyperbolic", "scaleway", "longcat", "deepseek",
+  "sambanova", "fireworks", "nebius", "hyperbolic", "scaleway", "longcat", "deepseek", "custom",
 ];
 
 const ProviderTypeDropdown = ({ value, onChange, onSelected }: { value: string; onChange: (v: string) => void; onSelected?: () => void }) => {
@@ -133,6 +133,7 @@ export const AiProvidersPanel = ({ onAddRef }: { onAddRef: React.MutableRefObjec
   const [formType, setFormType] = useState("groq");
   const [formName, setFormName] = useState("");
   const [formKey, setFormKey] = useState("");
+  const [formBaseUrl, setFormBaseUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
   const keyInputRef = useRef<HTMLInputElement>(null);
@@ -171,16 +172,19 @@ export const AiProvidersPanel = ({ onAddRef }: { onAddRef: React.MutableRefObjec
   onAddRef.current = () => { setFormName(getNextName(formType)); setShowForm(true); };
 
   const handleAdd = async () => {
-    if (!formName.trim() || !formKey.trim()) return;
+    if (!formName.trim()) return;
+    if (formType === "custom" && !formBaseUrl.trim()) return;
+    if (formType !== "custom" && !formKey.trim()) return;
     setLoading(true);
     await fetch("/api/providers", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ provider_type: formType, name: formName, api_key: formKey }),
+      body: JSON.stringify({ provider_type: formType, name: formName, api_key: formKey, base_url: formBaseUrl }),
     });
     setShowForm(false);
     setFormName("");
     setFormKey("");
+    setFormBaseUrl("");
     setLoading(false);
     setSuccessMsg(`${formType} key "${formName}" added`);
     setTimeout(() => setSuccessMsg(""), 4000);
@@ -245,9 +249,15 @@ export const AiProvidersPanel = ({ onAddRef }: { onAddRef: React.MutableRefObjec
                 <input type="text" value={formName} onChange={(e) => setFormName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") keyInputRef.current?.focus(); }} />
               </div>
               <div className="apis-field">
-                <label>API Key</label>
-                <input ref={keyInputRef} type="password" value={formKey} onChange={(e) => setFormKey(e.target.value)} placeholder="Enter key..." onKeyDown={(e) => { if (e.key === "Enter" && formName && formKey) void handleAdd(); }} />
+                <label>API Key{formType === "custom" ? " (optional)" : ""}</label>
+                <input ref={keyInputRef} type="password" value={formKey} onChange={(e) => setFormKey(e.target.value)} placeholder={formType === "custom" ? "Optional..." : "Enter key..."} onKeyDown={(e) => { if (e.key === "Enter" && formName && (formKey || formType === "custom")) void handleAdd(); }} />
               </div>
+              {formType === "custom" && (
+                <div className="apis-field">
+                  <label>Base URL (OpenAI-compatible endpoint)</label>
+                  <input type="text" value={formBaseUrl} onChange={(e) => setFormBaseUrl(e.target.value)} placeholder="https://api.example.com/v1" onKeyDown={(e) => { if (e.key === "Enter" && formName && formBaseUrl) void handleAdd(); }} />
+                </div>
+              )}
             </div>
             <footer className="apis-popup-footer">
               <button type="button" onClick={() => setShowForm(false)}>Cancel</button>

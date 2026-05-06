@@ -119,12 +119,12 @@ async def _call_google(api_key: str, model: str, messages: list[dict], system: s
     return data["candidates"][0]["content"]["parts"][0]["text"]
 
 
-async def _call_openai_compat(api_key: str, provider_type: str, model: str, messages: list[dict], system: str) -> str:
+async def _call_openai_compat(api_key: str, provider_type: str, model: str, messages: list[dict], system: str, custom_base_url: str = "") -> str:
     import httpx
     from clients.ai_providers import DEFAULT_BASE_URLS, ProviderType
 
     pt = ProviderType(provider_type)
-    base_url = DEFAULT_BASE_URLS.get(pt, "")
+    base_url = custom_base_url or DEFAULT_BASE_URLS.get(pt, "")
     if not base_url:
         raise ValueError(f"No base URL for provider: {provider_type}")
 
@@ -147,10 +147,10 @@ async def _call_openai_compat(api_key: str, provider_type: str, model: str, mess
     return data["choices"][0]["message"]["content"]
 
 
-async def _call_provider(api_key: str, provider_type: str, model: str, messages: list[dict], system: str) -> str:
+async def _call_provider(api_key: str, provider_type: str, model: str, messages: list[dict], system: str, custom_base_url: str = "") -> str:
     if provider_type == "google":
         return await _call_google(api_key, model, messages, system)
-    return await _call_openai_compat(api_key, provider_type, model, messages, system)
+    return await _call_openai_compat(api_key, provider_type, model, messages, system, custom_base_url)
 
 
 class RateLimitError(Exception):
@@ -274,6 +274,7 @@ async def chat_send(request: ChatRequest):
                 model=request.model,
                 messages=messages,
                 system=system,
+                custom_base_url=key_row.get("base_url", ""),
             )
             await _handle_save_context(request.repo, response)
 

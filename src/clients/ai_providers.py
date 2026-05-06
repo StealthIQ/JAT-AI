@@ -33,6 +33,7 @@ class ProviderType(StrEnum):
     SCALEWAY = "scaleway"
     LONGCAT = "longcat"
     DEEPSEEK = "deepseek"
+    CUSTOM = "custom"
 
 
 # Verified free tier limits as of April 2026
@@ -131,6 +132,9 @@ PROVIDER_LIMITS = {
             "deepseek-reasoner": {"rpm": 60, "rpd": 10000, "tpm": 1000000},
         },
         "notes": "OpenAI-compatible. V4 Pro at 75% discount until 2026/05/31. 1M context window.",
+    },
+    ProviderType.CUSTOM: {
+        "notes": "Any OpenAI-compatible endpoint. User provides base URL. API key optional.",
     },
 }
 
