@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import shutil
+import subprocess
 from pathlib import Path
 
 REPOS_DIR = Path("data/repos")
@@ -10,25 +11,24 @@ REPOMIX_DIR = Path("data/repomix")
 _deps_ready = False
 
 
-async def _run(cmd: str, cwd: str | None = None, timeout: int = 300) -> tuple[int, str, str]:
-    proc = await asyncio.create_subprocess_shell(
-        cmd,
-        cwd=cwd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
+def _run_sync(cmd: str, cwd: str | None = None, timeout: int = 300) -> tuple[int, str, str]:
     try:
-        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
-    except asyncio.TimeoutError:
-        proc.kill()
+        result = subprocess.run(
+            cmd, shell=True, cwd=cwd, timeout=timeout,
+            capture_output=True, text=True, errors="replace",
+        )
+    except subprocess.TimeoutExpired:
         return 1, "", f"Command timed out after {timeout}s: {cmd[:80]}"
-    out = stdout.decode(errors="replace")
-    err = stderr.decode(errors="replace")
-    if proc.returncode and proc.returncode != 0:
-        combined = (err or out).strip()
-        print(f"[repomix] CMD FAILED: {cmd}\n  rc={proc.returncode}\n  stdout={out[:200]}\n  stderr={err[:200]}")
-        return proc.returncode, out, combined or f"Command exited with code {proc.returncode}"
-    return 0, out, err
+    rc = result.returncode
+    if rc != 0:
+        combined = (result.stderr or result.stdout).strip()
+        print(f"[repomix] CMD FAILED: {cmd}\n  rc={rc}\n  stdout={result.stdout[:200]}\n  stderr={result.stderr[:200]}")
+        return rc, result.stdout, combined or f"Command exited with code {rc}"
+    return 0, result.stdout, result.stderr
+
+
+async def _run(cmd: str, cwd: str | None = None, timeout: int = 300) -> tuple[int, str, str]:
+    return await asyncio.to_thread(_run_sync, cmd, cwd, timeout)
 
 
 async def ensure_dependencies() -> None:
