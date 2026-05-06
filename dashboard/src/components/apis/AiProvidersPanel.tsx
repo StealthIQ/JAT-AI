@@ -11,7 +11,7 @@ type Provider = {
 const PROVIDER_TYPES = [
   "groq", "google", "cloudflare", "openrouter", "ollama", "cerebras",
   "cohere", "mistral", "nvidia_nim", "github_models", "huggingface",
-  "sambanova", "fireworks", "nebius", "hyperbolic", "scaleway", "longcat",
+  "sambanova", "fireworks", "nebius", "hyperbolic", "scaleway", "longcat", "deepseek",
 ];
 
 const ProviderTypeDropdown = ({ value, onChange, onSelected }: { value: string; onChange: (v: string) => void; onSelected?: () => void }) => {
