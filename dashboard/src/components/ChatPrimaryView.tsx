@@ -109,7 +109,9 @@ export const ChatPrimaryView = () => {
         setConversations((prev) => prev.map((c) => c.id === activeConvId
           ? { ...c, messages: msgs.length > 0 ? msgs : c.messages }
           : c));
-        if (msgs.length > 0) setIsStarted(true);
+        const conv = conversations.find((c) => c.id === activeConvId);
+        const wasStarted = msgs.length > 0 || (conv?.title !== "New conversation" && conv?.title !== "Untitled");
+        setIsStarted(wasStarted);
       })
       .catch(() => {});
   }, [activeConvId]);
