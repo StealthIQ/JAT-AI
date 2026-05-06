@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -61,7 +63,7 @@ async def add_message(conv_id: str, body: MessageCreate):
         "conversation_id": conv_id,
         "role": body.role,
         "content": body.content,
-        "metadata": body.metadata,
+        "metadata": json.dumps(body.metadata) if body.metadata else "{}",
     })
     return row
 
