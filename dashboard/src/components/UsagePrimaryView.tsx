@@ -9,14 +9,15 @@ type UsageStats = {
   recent: { provider: string; model: string; input: number; output: number; at: string }[];
 };
 
+// Equivalent market rates per million tokens even for free-tier providers
 const PRICING: Record<string, { input: number; output: number }> = {
-  nvidia_nim: { input: 0, output: 0 },
+  nvidia_nim: { input: 0.60, output: 0.60 },
   deepseek: { input: 0.27, output: 1.10 },
-  openrouter: { input: 0, output: 0 },
+  openrouter: { input: 0.50, output: 1.50 },
   google: { input: 0.075, output: 0.30 },
-  groq: { input: 0, output: 0 },
-  github_models: { input: 0, output: 0 },
-  custom: { input: 0, output: 0 },
+  groq: { input: 0.05, output: 0.08 },
+  github_models: { input: 0.30, output: 0.60 },
+  custom: { input: 0.50, output: 1.50 },
 };
 
 function estimateCost(byProvider: Record<string, { input_tokens: number; output_tokens: number }>): number {
@@ -143,7 +144,7 @@ export const UsagePrimaryView = () => {
         <StatCard label="Input Tokens" value={stats.total.input_tokens.toLocaleString()} sub="prompts + context" />
         <StatCard label="Output Tokens" value={stats.total.output_tokens.toLocaleString()} sub="AI responses" />
         <StatCard label="Today" value={(stats.today.input_tokens + stats.today.output_tokens).toLocaleString()} sub={`${stats.today.requests} requests today`} />
-        <StatCard label="Est. Cost" value={totalCost > 0 ? `$${totalCost.toFixed(4)}` : "FREE"} sub="based on provider pricing" />
+        <StatCard label="Est. Cost" value={`$${totalCost.toFixed(4)}`} sub="equivalent market rate" />
       </div>
 
       <div className="usage-graph-section">
@@ -163,7 +164,7 @@ export const UsagePrimaryView = () => {
                 <div key={name} className="usage-breakdown-row">
                   <span className="usage-breakdown-name">{name.replace("_", " ").toUpperCase()}</span>
                   <span className="usage-breakdown-tokens">{(data.input_tokens + data.output_tokens).toLocaleString()} tok</span>
-                  <span className="usage-breakdown-cost">{cost > 0 ? `$${cost.toFixed(4)}` : "free"}</span>
+                  <span className="usage-breakdown-cost">${cost.toFixed(4)}</span>
                   <span className="usage-breakdown-reqs">{data.requests} req</span>
                 </div>
               );
