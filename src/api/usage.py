@@ -50,7 +50,7 @@ async def get_usage_stats():
         rows = []
 
     now = datetime.now(timezone.utc)
-    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+    today_start = now.strftime("%Y-%m-%d 00:00:00")
 
     today_rows = [r for r in rows if r.get("created_at", "") >= today_start]
 
