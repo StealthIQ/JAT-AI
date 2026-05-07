@@ -81,6 +81,13 @@ class ModelUnavailableError extends Error {
   }
 }
 
+class RateLimitError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RateLimitError";
+  }
+}
+
 export const ChatPrimaryView = () => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
@@ -109,6 +116,7 @@ export const ChatPrimaryView = () => {
   const [deleteInput, setDeleteInput] = useState("");
   const [unreadConvIds, setUnreadConvIds] = useState<Set<string>>(new Set());
   const [showSummarizerSettings, setShowSummarizerSettings] = useState(false);
+  const [showRateLimitPopup, setShowRateLimitPopup] = useState(false);
   const [summarizerMode, setSummarizerMode] = useState<"free" | "ai">("free");
   const [summarizerProvider, setSummarizerProvider] = useState("");
   const [summarizerModel, setSummarizerModel] = useState("");
@@ -249,6 +257,9 @@ export const ChatPrimaryView = () => {
         if (r.status === 404) {
           return r.json().then((d: any) => { throw new ModelUnavailableError(d.detail ?? "Model not available"); });
         }
+        if (r.status === 429) {
+          return r.json().then((d: any) => { throw new RateLimitError(d.detail ?? "Rate limit exceeded"); });
+        }
         return r.json();
       })
       .then((data) => {
@@ -277,6 +288,11 @@ export const ChatPrimaryView = () => {
       })
       .catch((e) => {
         const isModelError = e instanceof ModelUnavailableError;
+        const isRateLimit = e instanceof RateLimitError;
+        if (isRateLimit) {
+          setShowRateLimitPopup(true);
+          return;
+        }
         const content = isModelError
           ? `${e.message}\n\nPlease select a different model from the dropdown above.`
           : "Failed to get response. Check backend.";
@@ -656,6 +672,27 @@ export const ChatPrimaryView = () => {
                       }).catch(() => {});
                       setShowSummarizerSettings(false);
                     }}>Save</button>
+                  </div>
+                </div>
+              </div>
+            )}
+            {showRateLimitPopup && (
+              <div className="chat-ratelimit-popup">
+                <div className="chat-ratelimit-popup-inner">
+                  <h4>Rate Limit Reached</h4>
+                  <p>The current provider has hit its request limit. You can switch to a different provider or wait a moment before retrying.</p>
+                  <div className="chat-ratelimit-actions">
+                    <button type="button" className="chat-ratelimit-switch" onClick={() => {
+                      setShowRateLimitPopup(false);
+                      const currentIdx = providerTypes.findIndex((g) => g.type === selectedProviderType);
+                      const nextIdx = (currentIdx + 1) % providerTypes.length;
+                      if (providerTypes[nextIdx]) setSelectedProviderType(providerTypes[nextIdx].type);
+                    }}>Switch Provider</button>
+                    <button type="button" className="chat-ratelimit-wait" onClick={() => {
+                      setShowRateLimitPopup(false);
+                      setTimeout(() => handleSend(), 5000);
+                    }}>Wait & Retry (5s)</button>
+                    <button type="button" className="chat-ratelimit-close" onClick={() => setShowRateLimitPopup(false)}>Dismiss</button>
                   </div>
                 </div>
               </div>
