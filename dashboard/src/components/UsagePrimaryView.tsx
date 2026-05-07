@@ -41,7 +41,17 @@ export const UsagePrimaryView = () => {
     setLoading(true);
     fetch("/api/usage/stats")
       .then((r) => r.json())
-      .then((d) => setStats(d))
+      .then((d) => {
+        const empty = { input_tokens: 0, output_tokens: 0, requests: 0 };
+        setStats({
+          total: d.total ?? empty,
+          today: d.today ?? empty,
+          by_provider: d.by_provider ?? {},
+          by_model: d.by_model ?? {},
+          daily: d.daily ?? [],
+          recent: d.recent ?? [],
+        });
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);

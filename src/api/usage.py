@@ -40,6 +40,13 @@ async def get_usage_stats():
     try:
         rows = await db.select("token_usage", order_by="created_at DESC")
     except Exception:
+        # Table may not exist yet on old DBs
+        try:
+            if hasattr(db, "_get_conn"):
+                db._get_conn().execute("CREATE TABLE IF NOT EXISTS token_usage (id TEXT PRIMARY KEY, provider_type TEXT NOT NULL DEFAULT '', model TEXT NOT NULL DEFAULT '', input_tokens INTEGER DEFAULT 0, output_tokens INTEGER DEFAULT 0, conversation_id TEXT DEFAULT '', created_at TEXT DEFAULT (datetime('now')))")
+                db._get_conn().commit()
+        except Exception:
+            pass
         rows = []
 
     now = datetime.now(timezone.utc)
