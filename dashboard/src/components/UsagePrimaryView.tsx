@@ -51,7 +51,7 @@ const DailyLineGraph = ({ daily }: { daily: UsageStats["daily"] }) => {
 
   return (
     <div className="usage-graph-container">
-      <svg viewBox={`0 0 ${w} ${h}`} className="usage-svg-graph">
+      <svg viewBox={`0 0 ${w} ${h}`} className="usage-svg-graph" preserveAspectRatio="xMidYMax meet">
         <line x1={pad} y1={h - pad} x2={w - pad} y2={h - pad} stroke="#2b2f36" strokeWidth="1" />
         <line x1={pad} y1={pad} x2={pad} y2={h - pad} stroke="#2b2f36" strokeWidth="1" />
         <polyline points={totalPoints} fill="none" stroke="#4a5568" strokeWidth="1.5" strokeDasharray="4 2" />
