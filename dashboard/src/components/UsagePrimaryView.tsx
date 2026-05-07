@@ -9,6 +9,26 @@ type UsageStats = {
   recent: { provider: string; model: string; input: number; output: number; at: string }[];
 };
 
+const PRICING: Record<string, { input: number; output: number }> = {
+  nvidia_nim: { input: 0, output: 0 },
+  deepseek: { input: 0.27, output: 1.10 },
+  openrouter: { input: 0, output: 0 },
+  google: { input: 0.075, output: 0.30 },
+  groq: { input: 0, output: 0 },
+  github_models: { input: 0, output: 0 },
+  custom: { input: 0, output: 0 },
+};
+
+function estimateCost(byProvider: Record<string, { input_tokens: number; output_tokens: number }>): number {
+  let total = 0;
+  for (const [provider, data] of Object.entries(byProvider)) {
+    const pricing = PRICING[provider] ?? { input: 0.50, output: 1.50 };
+    total += (data.input_tokens / 1_000_000) * pricing.input;
+    total += (data.output_tokens / 1_000_000) * pricing.output;
+  }
+  return total;
+}
+
 const StatCard = ({ label, value, sub }: { label: string; value: string; sub?: string }) => (
   <div className="usage-stat-card">
     <span className="usage-stat-label">{label}</span>
@@ -17,21 +37,64 @@ const StatCard = ({ label, value, sub }: { label: string; value: string; sub?: s
   </div>
 );
 
-const DailyBar = ({ day }: { day: { date: string; input_tokens: number; output_tokens: number; requests: number } }) => {
-  const total = day.input_tokens + day.output_tokens;
-  const maxHeight = 80;
-  const height = Math.min(maxHeight, Math.max(4, total / 500));
-  const inputPct = total > 0 ? (day.input_tokens / total) * 100 : 50;
+const DailyLineGraph = ({ daily }: { daily: UsageStats["daily"] }) => {
+  if (daily.length === 0) return <p className="usage-empty">No daily data yet</p>;
+
+  const w = 400, h = 120, pad = 24;
+  const maxVal = Math.max(...daily.map((d) => d.input_tokens + d.output_tokens), 1);
+  const stepX = (w - pad * 2) / Math.max(daily.length - 1, 1);
+
+  const inputPoints = daily.map((d, i) => `${pad + i * stepX},${h - pad - ((d.input_tokens / maxVal) * (h - pad * 2))}`).join(" ");
+  const outputPoints = daily.map((d, i) => `${pad + i * stepX},${h - pad - ((d.output_tokens / maxVal) * (h - pad * 2))}`).join(" ");
+  const totalPoints = daily.map((d, i) => `${pad + i * stepX},${h - pad - (((d.input_tokens + d.output_tokens) / maxVal) * (h - pad * 2))}`).join(" ");
+
   return (
-    <div className="usage-daily-bar-col">
-      <div className="usage-daily-bar" style={{ height: `${height}px` }}>
-        <div className="usage-daily-bar-input" style={{ height: `${inputPct}%` }} />
-        <div className="usage-daily-bar-output" style={{ height: `${100 - inputPct}%` }} />
+    <div className="usage-graph-container">
+      <svg viewBox={`0 0 ${w} ${h}`} className="usage-svg-graph">
+        <line x1={pad} y1={h - pad} x2={w - pad} y2={h - pad} stroke="#2b2f36" strokeWidth="1" />
+        <line x1={pad} y1={pad} x2={pad} y2={h - pad} stroke="#2b2f36" strokeWidth="1" />
+        <polyline points={totalPoints} fill="none" stroke="#4a5568" strokeWidth="1.5" strokeDasharray="4 2" />
+        <polyline points={inputPoints} fill="none" stroke="#00e5ff" strokeWidth="2" />
+        <polyline points={outputPoints} fill="none" stroke="#a855f7" strokeWidth="2" />
+        {daily.map((d, i) => (
+          <text key={d.date} x={pad + i * stepX} y={h - 6} textAnchor="middle" fill="#5a6a7e" fontSize="8">{d.date.slice(5)}</text>
+        ))}
+        <text x={pad - 4} y={pad + 4} textAnchor="end" fill="#5a6a7e" fontSize="7">{maxVal.toLocaleString()}</text>
+        <text x={pad - 4} y={h - pad} textAnchor="end" fill="#5a6a7e" fontSize="7">0</text>
+      </svg>
+      <div className="usage-graph-legend">
+        <span className="usage-legend-input">Input</span>
+        <span className="usage-legend-output">Output</span>
+        <span className="usage-legend-total">Total</span>
       </div>
-      <span className="usage-daily-bar-label">{day.date.slice(5)}</span>
     </div>
   );
 };
+
+const DailyBarChart = ({ daily }: { daily: UsageStats["daily"] }) => {
+  if (daily.length === 0) return null;
+  const maxVal = Math.max(...daily.map((d) => d.input_tokens + d.output_tokens), 1);
+
+  return (
+    <div className="usage-daily-chart">
+      {daily.map((day) => {
+        const total = day.input_tokens + day.output_tokens;
+        const height = Math.max(4, (total / maxVal) * 80);
+        const inputPct = total > 0 ? (day.input_tokens / total) * 100 : 50;
+        return (
+          <div key={day.date} className="usage-daily-bar-col" title={`${day.date}: ${total.toLocaleString()} tokens (${day.requests} req)`}>
+            <div className="usage-daily-bar" style={{ height: `${height}px` }}>
+              <div className="usage-daily-bar-input" style={{ height: `${inputPct}%` }} />
+              <div className="usage-daily-bar-output" style={{ height: `${100 - inputPct}%` }} />
+            </div>
+            <span className="usage-daily-bar-label">{day.date.slice(5)}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
 
 export const UsagePrimaryView = () => {
   const [stats, setStats] = useState<UsageStats | null>(null);
@@ -66,6 +129,8 @@ export const UsagePrimaryView = () => {
     return <section className="usage-view"><div className="usage-loading">No usage data available yet. Start chatting to track tokens.</div></section>;
   }
 
+  const totalCost = estimateCost(stats.by_provider);
+
   return (
     <section className="usage-view" aria-label="Usage analytics">
       <header className="usage-header">
@@ -78,30 +143,31 @@ export const UsagePrimaryView = () => {
         <StatCard label="Input Tokens" value={stats.total.input_tokens.toLocaleString()} sub="prompts + context" />
         <StatCard label="Output Tokens" value={stats.total.output_tokens.toLocaleString()} sub="AI responses" />
         <StatCard label="Today" value={(stats.today.input_tokens + stats.today.output_tokens).toLocaleString()} sub={`${stats.today.requests} requests today`} />
+        <StatCard label="Est. Cost" value={totalCost > 0 ? `$${totalCost.toFixed(4)}` : "FREE"} sub="based on provider pricing" />
+      </div>
+
+      <div className="usage-graph-section">
+        <h3>Daily Token Usage (7 Days)</h3>
+        <DailyLineGraph daily={stats.daily} />
+        <DailyBarChart daily={stats.daily} />
       </div>
 
       <div className="usage-sections-row">
         <div className="usage-section">
-          <h3>Last 7 Days</h3>
-          <div className="usage-daily-chart">
-            {stats.daily.map((day) => <DailyBar key={day.date} day={day} />)}
-          </div>
-          <div className="usage-daily-legend">
-            <span className="usage-legend-input">Input</span>
-            <span className="usage-legend-output">Output</span>
-          </div>
-        </div>
-
-        <div className="usage-section">
           <h3>By Provider</h3>
           <div className="usage-breakdown-list">
-            {Object.entries(stats.by_provider).map(([name, data]) => (
-              <div key={name} className="usage-breakdown-row">
-                <span className="usage-breakdown-name">{name.replace("_", " ").toUpperCase()}</span>
-                <span className="usage-breakdown-tokens">{(data.input_tokens + data.output_tokens).toLocaleString()} tok</span>
-                <span className="usage-breakdown-reqs">{data.requests} req</span>
-              </div>
-            ))}
+            {Object.entries(stats.by_provider).map(([name, data]) => {
+              const pricing = PRICING[name] ?? { input: 0.50, output: 1.50 };
+              const cost = (data.input_tokens / 1_000_000) * pricing.input + (data.output_tokens / 1_000_000) * pricing.output;
+              return (
+                <div key={name} className="usage-breakdown-row">
+                  <span className="usage-breakdown-name">{name.replace("_", " ").toUpperCase()}</span>
+                  <span className="usage-breakdown-tokens">{(data.input_tokens + data.output_tokens).toLocaleString()} tok</span>
+                  <span className="usage-breakdown-cost">{cost > 0 ? `$${cost.toFixed(4)}` : "free"}</span>
+                  <span className="usage-breakdown-reqs">{data.requests} req</span>
+                </div>
+              );
+            })}
             {Object.keys(stats.by_provider).length === 0 && <p className="usage-empty">No data yet</p>}
           </div>
         </div>
@@ -117,6 +183,27 @@ export const UsagePrimaryView = () => {
               </div>
             ))}
             {Object.keys(stats.by_model).length === 0 && <p className="usage-empty">No data yet</p>}
+          </div>
+        </div>
+
+        <div className="usage-section">
+          <h3>Cost Breakdown</h3>
+          <div className="usage-breakdown-list">
+            {Object.entries(stats.by_provider).map(([name, data]) => {
+              const pricing = PRICING[name] ?? { input: 0.50, output: 1.50 };
+              const inputCost = (data.input_tokens / 1_000_000) * pricing.input;
+              const outputCost = (data.output_tokens / 1_000_000) * pricing.output;
+              return (
+                <div key={name} className="usage-cost-row">
+                  <span className="usage-breakdown-name">{name.replace("_", " ").toUpperCase()}</span>
+                  <div className="usage-cost-detail">
+                    <span>In: ${inputCost.toFixed(4)} ({pricing.input}/M)</span>
+                    <span>Out: ${outputCost.toFixed(4)} ({pricing.output}/M)</span>
+                  </div>
+                </div>
+              );
+            })}
+            {Object.keys(stats.by_provider).length === 0 && <p className="usage-empty">No cost data yet</p>}
           </div>
         </div>
       </div>
