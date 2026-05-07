@@ -50,9 +50,10 @@ async def clone_or_pull(owner: str, repo: str, token: str) -> Path:
     repo_path.parent.mkdir(parents=True, exist_ok=True)
 
     if (repo_path / ".git").exists():
-        rc, _, stderr = await _run("git pull --ff-only", cwd=str(repo_path))
+        rc, _, stderr = await _run("git fetch origin", cwd=str(repo_path))
         if rc != 0:
-            raise RuntimeError(f"git pull failed (rc={rc}): {stderr[:200]}")
+            raise RuntimeError(f"git fetch failed (rc={rc}): {stderr[:200]}")
+        await _run("git reset --hard origin/HEAD", cwd=str(repo_path))
     else:
         url = f"https://{token}@github.com/{owner}/{repo}.git"
         # -c credential.helper= disables Git Credential Manager popup on Windows
