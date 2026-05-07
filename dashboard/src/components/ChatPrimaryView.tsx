@@ -87,6 +87,7 @@ export const ChatPrimaryView = () => {
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const activeConvIdRef = useRef<string | null>(null);
 
   const [providerTypes, setProviderTypes] = useState<ProviderGroup[]>([]);
   const [providersLoaded, setProvidersLoaded] = useState(false);
@@ -100,6 +101,7 @@ export const ChatPrimaryView = () => {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [mode, setMode] = useState<"ask" | "plan" | "build" | "auto">("ask");
   const [isStarted, setIsStarted] = useState(false);
+  const [messagesLoading, setMessagesLoading] = useState(false);
   const [analyzingConvIds, setAnalyzingConvIds] = useState<Set<string>>(new Set());
   const [usage, setUsage] = useState({ tokensUsed: 0, tokensLimit: 0, rpmLimit: 40, requestsToday: 0 });
   const [chatSearch, setChatSearch] = useState("");
@@ -132,8 +134,9 @@ export const ChatPrimaryView = () => {
 
   useEffect(() => { fetchConversations(); }, [fetchConversations]);
 
-  useEffect(() => {
+  useEffect(() => { activeConvIdRef.current = activeConvId; }, [activeConvId]);  useEffect(() => {
     if (!activeConvId) return;
+    setMessagesLoading(true);
     fetch(`/api/conversations/${activeConvId}/messages`)
       .then((r) => r.json())
       .then((d) => {
@@ -149,7 +152,8 @@ export const ChatPrimaryView = () => {
           : c));
         setIsStarted(msgs.length > 0);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setMessagesLoading(false));
     setUnreadConvIds((prev) => {
       if (!prev.has(activeConvId)) return prev;
       const next = new Set(prev);
@@ -242,6 +246,7 @@ export const ChatPrimaryView = () => {
           return updated;
         });
         setUnreadConvIds((prev) => {
+          if (activeConvIdRef.current === sendingConvId) return prev;
           const next = new Set(prev);
           next.add(sendingConvId);
           return next;
@@ -303,10 +308,17 @@ export const ChatPrimaryView = () => {
             return updated;
           });
           setIsStarted(true);
-          setUnreadConvIds((prev) => new Set(prev).add(startingConvId));
+          setUnreadConvIds((prev) => {
+            if (activeConvIdRef.current === startingConvId) return prev;
+            return new Set(prev).add(startingConvId);
+          });
           fetch(`/api/conversations/${startingConvId}`, {
             method: "PATCH", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ title: selectedRepo, model: selectedModel }),
+          }).catch(() => {});
+          fetch(`/api/conversations/${startingConvId}/messages`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ role: "assistant", content: data.response }),
           }).catch(() => {});
         }
       })
@@ -422,7 +434,7 @@ export const ChatPrimaryView = () => {
         <input className="chat-search" type="text" placeholder="Search chats..." value={chatSearch} onChange={(e) => setChatSearch(e.target.value)} />
         <div className="chat-conv-list">
           {conversations.filter((c) => c.title.toLowerCase().includes(chatSearch.toLowerCase())).map((c) => (
-            <button key={c.id} type="button" className={`chat-conv-item${activeConvId === c.id ? " is-active" : ""}`} onClick={() => { setActiveConvId(c.id); setUnreadConvIds((prev) => { const next = new Set(prev); next.delete(c.id); return next; }); }}>
+            <button key={c.id} type="button" className={`chat-conv-item${activeConvId === c.id ? " is-active" : ""}${unreadConvIds.has(c.id) && activeConvId !== c.id ? " has-unread" : ""}`} onClick={() => { setActiveConvId(c.id); setUnreadConvIds((prev) => { const next = new Set(prev); next.delete(c.id); return next; }); }}>
               <div className="chat-conv-row">
                 <span className="chat-conv-title">{c.title}</span>
                 <span className="chat-conv-id">{c.id.slice(-6)}</span>
@@ -431,82 +443,81 @@ export const ChatPrimaryView = () => {
                 <span className="chat-conv-meta">{c.model ? c.model.split("/").pop() : "no model"}</span>
                 <span className="chat-conv-date">{new Date(c.createdAt).toLocaleDateString()} {new Date(c.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
               </div>
-              {unreadConvIds.has(c.id) && activeConvId !== c.id && <span className="chat-conv-unread-dot" />}
             </button>
           ))}
         </div>
       </aside>
       <main className="chat-main">
+        <header className="chat-header">
+          <span className="chat-header-label">Model:</span>
+          <SearchableDropdown items={providerItems} selected={selectedProviderType} onSelect={setSelectedProviderType} placeholder="No providers" searchPlaceholder="Search providers..." />
+          <SearchableDropdown items={modelItems} selected={selectedModel} onSelect={setSelectedModel} placeholder="Select model" searchPlaceholder="Search models..." disabled={modelsLoading} />
+          <div className="chat-header-spacer" />
+          <span className="chat-header-label">Repo:</span>
+          <SearchableDropdown items={repoItems} selected={selectedRepo} onSelect={setSelectedRepo} placeholder="Select repo" searchPlaceholder="Search repos..." />
+          <div className="chat-header-spacer" />
+          <div className="chat-mode-selector">
+            {(["ask", "plan", "build"] as const).map((m) => (
+              <button key={m} type="button" className={`chat-mode-btn${mode === m ? " is-active" : ""}`} onClick={() => setMode(m)}>{m.toUpperCase()}</button>
+            ))}
+            <button type="button" className={`chat-mode-btn${mode === "auto" ? " is-active" : ""}`} onClick={exec.handleAutoMode} disabled={!selectedRepo || !selectedModel || exec.isExecuting}>AUTO</button>
+          </div>
+          {exec.planReady && !exec.isExecuting && (
+            <button type="button" className="chat-approve-btn" onClick={exec.handleApprove}>Approve Plan</button>
+          )}
+          {exec.executionStatus && <span className="chat-exec-status">{exec.executionStatus}</span>}
+          {!isStarted && !messagesLoading && activeConv && (
+            <button type="button" className="chat-start-btn" onClick={handleStart} disabled={!selectedRepo || !selectedModel || isAnalyzing}>
+              {isAnalyzing ? "Analyzing..." : "Start"}
+            </button>
+          )}
+          <div className="chat-usage-stats">
+            <div className="chat-usage-bar-group">
+              <span className="chat-usage-label">Tokens</span>
+              <div className="chat-usage-bar"><div className="chat-usage-bar-fill" style={{ width: `${usage.tokensLimit > 0 ? Math.max(0, 100 - (usage.tokensUsed / usage.tokensLimit) * 100) : 100}%` }} /></div>
+              <span className="chat-usage-value">{usage.tokensUsed.toLocaleString()}{usage.tokensLimit > 0 ? `/${usage.tokensLimit.toLocaleString()}` : ""}</span>
+            </div>
+            <div className="chat-usage-bar-group">
+              <span className="chat-usage-label">RPM</span>
+              <div className="chat-usage-bar"><div className="chat-usage-bar-fill" style={{ width: `${Math.max(0, 100 - (usage.requestsToday / usage.rpmLimit) * 100)}%` }} /></div>
+              <span className="chat-usage-value">{usage.requestsToday}/{usage.rpmLimit}</span>
+            </div>
+          </div>
+          {activeConv && <button type="button" className="chat-delete-btn" onClick={() => setShowDeleteConfirm(true)}>Delete</button>}
+          {showDeleteConfirm && (
+            <div className="chat-delete-popup">
+              <div className="chat-delete-popup-inner">
+                <p>Type <strong>delete chat</strong> to confirm deletion</p>
+                <input type="text" value={deleteInput} onChange={(e) => setDeleteInput(e.target.value)} placeholder="delete chat" autoFocus onKeyDown={(e) => {
+                  if (e.key === "Enter" && deleteInput === "delete chat" && activeConvId) {
+                    fetch(`/api/conversations/${activeConvId}`, { method: "DELETE" }).catch(() => {});
+                    setConversations((prev) => prev.filter((c) => c.id !== activeConvId));
+                    const remaining = conversations.filter((c) => c.id !== activeConvId);
+                    setActiveConvId(remaining.length > 0 ? remaining[0].id : null);
+                    setShowDeleteConfirm(false);
+                    setDeleteInput("");
+                    setIsStarted(false);
+                  }
+                }} />
+                <div className="chat-delete-popup-actions">
+                  <button type="button" onClick={() => { setShowDeleteConfirm(false); setDeleteInput(""); }}>Cancel</button>
+                  <button type="button" className="chat-delete-confirm-btn" disabled={deleteInput !== "delete chat"} onClick={() => {
+                    if (!activeConvId) return;
+                    fetch(`/api/conversations/${activeConvId}`, { method: "DELETE" }).catch(() => {});
+                    setConversations((prev) => prev.filter((c) => c.id !== activeConvId));
+                    const remaining = conversations.filter((c) => c.id !== activeConvId);
+                    setActiveConvId(remaining.length > 0 ? remaining[0].id : null);
+                    setShowDeleteConfirm(false);
+                    setDeleteInput("");
+                    setIsStarted(false);
+                  }}>Delete</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </header>
         {activeConv ? (
           <>
-            <header className="chat-header">
-              <span className="chat-header-label">Model:</span>
-              <SearchableDropdown items={providerItems} selected={selectedProviderType} onSelect={setSelectedProviderType} placeholder="No providers" searchPlaceholder="Search providers..." />
-              <SearchableDropdown items={modelItems} selected={selectedModel} onSelect={setSelectedModel} placeholder="Select model" searchPlaceholder="Search models..." disabled={modelsLoading} />
-              <div className="chat-header-spacer" />
-              <span className="chat-header-label">Repo:</span>
-              <SearchableDropdown items={repoItems} selected={selectedRepo} onSelect={setSelectedRepo} placeholder="Select repo" searchPlaceholder="Search repos..." />
-              <div className="chat-header-spacer" />
-              <div className="chat-mode-selector">
-                {(["ask", "plan", "build"] as const).map((m) => (
-                  <button key={m} type="button" className={`chat-mode-btn${mode === m ? " is-active" : ""}`} onClick={() => setMode(m)}>{m.toUpperCase()}</button>
-                ))}
-                <button type="button" className={`chat-mode-btn${mode === "auto" ? " is-active" : ""}`} onClick={exec.handleAutoMode} disabled={!selectedRepo || !selectedModel || exec.isExecuting}>AUTO</button>
-              </div>
-              {exec.planReady && !exec.isExecuting && (
-                <button type="button" className="chat-approve-btn" onClick={exec.handleApprove}>Approve Plan</button>
-              )}
-              {exec.executionStatus && <span className="chat-exec-status">{exec.executionStatus}</span>}
-              {!isStarted && (
-                <button type="button" className="chat-start-btn" onClick={handleStart} disabled={!selectedRepo || !selectedModel || isAnalyzing}>
-                  {isAnalyzing ? "Analyzing..." : "Start"}
-                </button>
-              )}
-              <div className="chat-usage-stats">
-                <div className="chat-usage-bar-group">
-                  <span className="chat-usage-label">Tokens</span>
-                  <div className="chat-usage-bar"><div className="chat-usage-bar-fill" style={{ width: `${usage.tokensLimit > 0 ? Math.max(0, 100 - (usage.tokensUsed / usage.tokensLimit) * 100) : 100}%` }} /></div>
-                  <span className="chat-usage-value">{usage.tokensUsed.toLocaleString()}{usage.tokensLimit > 0 ? `/${usage.tokensLimit.toLocaleString()}` : ""}</span>
-                </div>
-                <div className="chat-usage-bar-group">
-                  <span className="chat-usage-label">RPM</span>
-                  <div className="chat-usage-bar"><div className="chat-usage-bar-fill" style={{ width: `${Math.max(0, 100 - (usage.requestsToday / usage.rpmLimit) * 100)}%` }} /></div>
-                  <span className="chat-usage-value">{usage.requestsToday}/{usage.rpmLimit}</span>
-                </div>
-              </div>
-              <button type="button" className="chat-delete-btn" onClick={() => setShowDeleteConfirm(true)}>Delete</button>
-              {showDeleteConfirm && (
-                <div className="chat-delete-popup">
-                  <div className="chat-delete-popup-inner">
-                    <p>Type <strong>delete chat</strong> to confirm deletion</p>
-                    <input type="text" value={deleteInput} onChange={(e) => setDeleteInput(e.target.value)} placeholder="delete chat" autoFocus onKeyDown={(e) => {
-                      if (e.key === "Enter" && deleteInput === "delete chat" && activeConvId) {
-                        fetch(`/api/conversations/${activeConvId}`, { method: "DELETE" }).catch(() => {});
-                        setConversations((prev) => prev.filter((c) => c.id !== activeConvId));
-                        const remaining = conversations.filter((c) => c.id !== activeConvId);
-                        setActiveConvId(remaining.length > 0 ? remaining[0].id : null);
-                        setShowDeleteConfirm(false);
-                        setDeleteInput("");
-                        setIsStarted(false);
-                      }
-                    }} />
-                    <div className="chat-delete-popup-actions">
-                      <button type="button" onClick={() => { setShowDeleteConfirm(false); setDeleteInput(""); }}>Cancel</button>
-                      <button type="button" className="chat-delete-confirm-btn" disabled={deleteInput !== "delete chat"} onClick={() => {
-                        if (!activeConvId) return;
-                        fetch(`/api/conversations/${activeConvId}`, { method: "DELETE" }).catch(() => {});
-                        setConversations((prev) => prev.filter((c) => c.id !== activeConvId));
-                        const remaining = conversations.filter((c) => c.id !== activeConvId);
-                        setActiveConvId(remaining.length > 0 ? remaining[0].id : null);
-                        setShowDeleteConfirm(false);
-                        setDeleteInput("");
-                        setIsStarted(false);
-                      }}>Delete</button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </header>
             <div className="chat-body-row">
               <div className="chat-messages">
                 {isAnalyzing && (
@@ -515,7 +526,7 @@ export const ChatPrimaryView = () => {
                     <span className="chat-setup-text">Setting up — analyzing repository...</span>
                   </div>
                 )}
-                {!isStarted && !isAnalyzing && activeConv.messages.length === 0 && (
+                {!isStarted && !isAnalyzing && !messagesLoading && activeConv.messages.length === 0 && (
                   <div className="chat-setup-overlay">
                     <span className="chat-setup-text">Select a repo and click Start to begin</span>
                   </div>

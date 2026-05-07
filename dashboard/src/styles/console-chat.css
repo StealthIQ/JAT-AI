@@ -901,18 +901,13 @@
   background: color-mix(in srgb, var(--accent-primary) 10%, #11161d);
 }
 
-.chat-conv-unread-dot {
-  position: absolute;
-  bottom: 6px;
-  right: 8px;
-  width: 8px;
-  height: 8px;
-  background: #25d366;
-  border-radius: 50%;
-  animation: chat-unread-blink 1.2s ease-in-out infinite;
+.chat-conv-item.has-unread {
+  border-color: #a855f7;
+  background: color-mix(in srgb, #a855f7 12%, var(--sidebar-row));
+  animation: chat-unread-pulse 1.4s ease-in-out infinite;
 }
 
-@keyframes chat-unread-blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
+@keyframes chat-unread-pulse {
+  0%, 100% { border-color: #a855f7; }
+  50% { border-color: color-mix(in srgb, #a855f7 40%, transparent); }
 }

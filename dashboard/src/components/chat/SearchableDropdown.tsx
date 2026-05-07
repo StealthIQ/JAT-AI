@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useState } from "react";
 
 type Props = {
   items: { id: string; label: string }[];
@@ -21,25 +21,12 @@ export const SearchableDropdown = memo(({
 }: Props) => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-        setSearch("");
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
 
   const filtered = items.filter((i) => i.label.toLowerCase().includes(search.toLowerCase()));
   const label = displayValue ?? items.find((i) => i.id === selected)?.label ?? placeholder;
 
   return (
-    <div className="chat-model-dropdown" ref={ref}>
+    <div className="chat-model-dropdown">
       <button
         type="button"
         className="chat-model-dropdown-trigger"
