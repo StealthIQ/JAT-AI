@@ -67,6 +67,7 @@ type Conversation = {
   title: string;
   messages: Message[];
   createdAt: string;
+  updatedAt: string;
   providerId?: string;
   model?: string;
 };
@@ -99,11 +100,12 @@ export const ChatPrimaryView = () => {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const [mode, setMode] = useState<"ask" | "plan" | "build" | "auto">("ask");
   const [isStarted, setIsStarted] = useState(false);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analyzingConvIds, setAnalyzingConvIds] = useState<Set<string>>(new Set());
   const [usage, setUsage] = useState({ tokensUsed: 0, tokensLimit: 0, rpmLimit: 40, requestsToday: 0 });
   const [chatSearch, setChatSearch] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteInput, setDeleteInput] = useState("");
+  const [unreadConvIds, setUnreadConvIds] = useState<Set<string>>(new Set());
 
   const tasks = useLiveTaskStatus();
   const activeConv = conversations.find((c) => c.id === activeConvId) ?? null;
@@ -116,9 +118,15 @@ export const ChatPrimaryView = () => {
   const fetchConversations = useCallback(() => {
     fetch("/api/conversations").then((r) => r.json()).then((d) => {
       const convs = (d.conversations ?? []).map((c: any) => ({
-        id: c.id, title: c.title || "Untitled", messages: [], createdAt: c.created_at, model: c.model,
+        id: c.id, title: c.title || "Untitled", messages: [], createdAt: c.created_at, updatedAt: c.updated_at || c.created_at, model: c.model,
       }));
-      if (convs.length > 0) { setConversations(convs); setActiveConvId(convs[0].id); }
+      convs.sort((a: Conversation, b: Conversation) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+      setConversations((prev) => {
+        // Preserve already-loaded messages
+        const msgMap = new Map(prev.map((c) => [c.id, c.messages]));
+        return convs.map((c: Conversation) => ({ ...c, messages: msgMap.get(c.id) ?? c.messages }));
+      });
+      setActiveConvId((prev) => prev ?? (convs.length > 0 ? convs[0].id : null));
     }).catch(() => {});
   }, []);
 
@@ -126,11 +134,6 @@ export const ChatPrimaryView = () => {
 
   useEffect(() => {
     if (!activeConvId) return;
-    const conv = conversations.find((c) => c.id === activeConvId);
-    if (conv && conv.messages.length > 0) {
-      setIsStarted(true);
-      return;
-    }
     fetch(`/api/conversations/${activeConvId}/messages`)
       .then((r) => r.json())
       .then((d) => {
@@ -144,10 +147,15 @@ export const ChatPrimaryView = () => {
         setConversations((prev) => prev.map((c) => c.id === activeConvId
           ? { ...c, messages: msgs.length > 0 ? msgs : c.messages }
           : c));
-        const wasStarted = msgs.length > 0 || (conv?.title !== "New conversation" && conv?.title !== "Untitled");
-        setIsStarted(wasStarted);
+        setIsStarted(msgs.length > 0);
       })
       .catch(() => {});
+    setUnreadConvIds((prev) => {
+      if (!prev.has(activeConvId)) return prev;
+      const next = new Set(prev);
+      next.delete(activeConvId);
+      return next;
+    });
   }, [activeConvId]);
 
   useEffect(() => {
@@ -193,19 +201,20 @@ export const ChatPrimaryView = () => {
 
   const handleSend = useCallback(() => {
     if (!input.trim() || !activeConvId) return;
+    const sendingConvId = activeConvId;
     const userMsg: Message = { id: `m-${Date.now()}`, role: "user", content: input.trim(), timestamp: new Date().toISOString() };
-    setConversations((prev) => prev.map((c) => c.id === activeConvId ? { ...c, messages: [...c.messages, userMsg] } : c));
+    setConversations((prev) => prev.map((c) => c.id === sendingConvId ? { ...c, messages: [...c.messages, userMsg] } : c));
     const currentInput = input.trim();
     setInput("");
     setIsTyping(true);
     setUsage((u) => ({ ...u, requestsToday: u.requestsToday + 1, tokensUsed: u.tokensUsed + currentInput.length }));
 
-    fetch(`/api/conversations/${activeConvId}/messages`, {
+    fetch(`/api/conversations/${sendingConvId}/messages`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ role: "user", content: currentInput }),
     }).catch(() => {});
 
-    const conv = conversations.find((c) => c.id === activeConvId);
+    const conv = conversations.find((c) => c.id === sendingConvId);
     const history = [...(conv?.messages ?? []), { role: "user", content: currentInput }]
       .map((m) => ({ role: m.role, content: m.content }));
 
@@ -226,12 +235,22 @@ export const ChatPrimaryView = () => {
       .then((data) => {
         const content = data.response ?? data.detail ?? "No response";
         const assistantMsg: Message = { id: `m-${Date.now() + 1}`, role: "assistant", content, timestamp: new Date().toISOString(), model: selectedModel };
-        setConversations((prev) => prev.map((c) => c.id === activeConvId ? { ...c, messages: [...c.messages, assistantMsg] } : c));
+        const now = new Date().toISOString();
+        setConversations((prev) => {
+          const updated = prev.map((c) => c.id === sendingConvId ? { ...c, messages: [...c.messages, assistantMsg], updatedAt: now } : c);
+          updated.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+          return updated;
+        });
+        setUnreadConvIds((prev) => {
+          const next = new Set(prev);
+          next.add(sendingConvId);
+          return next;
+        });
         setUsage((u) => ({ ...u, tokensUsed: u.tokensUsed + content.length }));
         if (mode === "plan" && (content.includes('"tasks"') || content.includes('"execution_mode"'))) {
           exec.setPlanReady(true);
         }
-        fetch(`/api/conversations/${activeConvId}/messages`, {
+        fetch(`/api/conversations/${sendingConvId}/messages`, {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ role: "assistant", content }),
         }).catch(() => {});
@@ -242,14 +261,15 @@ export const ChatPrimaryView = () => {
           ? `${e.message}\n\nPlease select a different model from the dropdown above.`
           : "Failed to get response. Check backend.";
         const errMsg: Message = { id: `m-${Date.now() + 1}`, role: "assistant", content, timestamp: new Date().toISOString() };
-        setConversations((prev) => prev.map((c) => c.id === activeConvId ? { ...c, messages: [...c.messages, errMsg] } : c));
+        setConversations((prev) => prev.map((c) => c.id === sendingConvId ? { ...c, messages: [...c.messages, errMsg] } : c));
       })
       .finally(() => { setIsTyping(false); setImagePreview(null); });
   }, [input, activeConvId, selectedModel, selectedProviderType, conversations, imagePreview, mode, exec]);
 
   const handleStart = useCallback(() => {
     if (!selectedRepo || !selectedProviderType || !selectedModel || !activeConvId) return;
-    setIsAnalyzing(true);
+    const startingConvId = activeConvId;
+    setAnalyzingConvIds((prev) => new Set(prev).add(startingConvId));
     fetch(`/api/repos/iceyxsm/${selectedRepo}/analyze`, { method: "POST" })
       .then((r) => r.json())
       .then((data) => {
@@ -274,11 +294,17 @@ export const ChatPrimaryView = () => {
       .then((data) => {
         if (data?.response) {
           const msg: Message = { id: `m-${Date.now()}`, role: "assistant", content: data.response, timestamp: new Date().toISOString(), model: selectedModel };
-          setConversations((prev) => prev.map((c) => c.id === activeConvId
-            ? { ...c, messages: [...c.messages, msg], model: selectedModel, title: selectedRepo }
-            : c));
+          const now = new Date().toISOString();
+          setConversations((prev) => {
+            const updated = prev.map((c) => c.id === startingConvId
+              ? { ...c, messages: [...c.messages, msg], model: selectedModel, title: selectedRepo, updatedAt: now }
+              : c);
+            updated.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+            return updated;
+          });
           setIsStarted(true);
-          fetch(`/api/conversations/${activeConvId}`, {
+          setUnreadConvIds((prev) => new Set(prev).add(startingConvId));
+          fetch(`/api/conversations/${startingConvId}`, {
             method: "PATCH", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ title: selectedRepo, model: selectedModel }),
           }).catch(() => {});
@@ -290,9 +316,11 @@ export const ChatPrimaryView = () => {
           ? `${e.message}\n\nPlease select a different model from the dropdown above and click Start again.`
           : `Start failed: ${e.message}`;
         const errMsg: Message = { id: `m-${Date.now()}`, role: "assistant", content, timestamp: new Date().toISOString() };
-        setConversations((prev) => prev.map((c) => c.id === activeConvId ? { ...c, messages: [...c.messages, errMsg] } : c));
+        setConversations((prev) => prev.map((c) => c.id === startingConvId ? { ...c, messages: [...c.messages, errMsg] } : c));
       })
-      .finally(() => setIsAnalyzing(false));
+      .finally(() => {
+        setAnalyzingConvIds((prev) => { const next = new Set(prev); next.delete(startingConvId); return next; });
+      });
   }, [selectedRepo, selectedProviderType, selectedModel, activeConvId]);
 
   const handleNewConversation = useCallback(() => {
@@ -300,17 +328,16 @@ export const ChatPrimaryView = () => {
     fetch("/api/conversations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
       .then((r) => r.json())
       .then((data) => {
-        const newConv: Conversation = { id: data.id, title: body.title, messages: [], createdAt: new Date().toISOString(), model: selectedModel };
+        const newConv: Conversation = { id: data.id, title: body.title, messages: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), model: selectedModel };
         setConversations((prev) => [newConv, ...prev]);
         setActiveConvId(data.id);
       })
       .catch(() => {
-        const newConv: Conversation = { id: `conv-${Date.now()}`, title: "New conversation", messages: [], createdAt: new Date().toISOString(), model: selectedModel };
+        const newConv: Conversation = { id: `conv-${Date.now()}`, title: "New conversation", messages: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), model: selectedModel };
         setConversations((prev) => [newConv, ...prev]);
         setActiveConvId(newConv.id);
       });
     setIsStarted(false);
-    setIsAnalyzing(false);
     exec.resetExecution();
   }, [exec, selectedModel, selectedProviderType, selectedRepo, mode]);
 
@@ -370,6 +397,7 @@ export const ChatPrimaryView = () => {
   };
 
   const showTasks = (mode === "plan" || mode === "build" || mode === "auto") && tasks.length > 0;
+  const isAnalyzing = activeConvId ? analyzingConvIds.has(activeConvId) : false;
   const hasExistingMessages = (activeConv?.messages.length ?? 0) > 0;
   const chatEnabled = isStarted || hasExistingMessages;
 
@@ -394,7 +422,7 @@ export const ChatPrimaryView = () => {
         <input className="chat-search" type="text" placeholder="Search chats..." value={chatSearch} onChange={(e) => setChatSearch(e.target.value)} />
         <div className="chat-conv-list">
           {conversations.filter((c) => c.title.toLowerCase().includes(chatSearch.toLowerCase())).map((c) => (
-            <button key={c.id} type="button" className={`chat-conv-item${activeConvId === c.id ? " is-active" : ""}`} onClick={() => { setActiveConvId(c.id); setIsStarted(c.messages.length > 0); setIsAnalyzing(false); }}>
+            <button key={c.id} type="button" className={`chat-conv-item${activeConvId === c.id ? " is-active" : ""}`} onClick={() => { setActiveConvId(c.id); setUnreadConvIds((prev) => { const next = new Set(prev); next.delete(c.id); return next; }); }}>
               <div className="chat-conv-row">
                 <span className="chat-conv-title">{c.title}</span>
                 <span className="chat-conv-id">{c.id.slice(-6)}</span>
@@ -403,6 +431,7 @@ export const ChatPrimaryView = () => {
                 <span className="chat-conv-meta">{c.model ? c.model.split("/").pop() : "no model"}</span>
                 <span className="chat-conv-date">{new Date(c.createdAt).toLocaleDateString()} {new Date(c.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
               </div>
+              {unreadConvIds.has(c.id) && activeConvId !== c.id && <span className="chat-conv-unread-dot" />}
             </button>
           ))}
         </div>

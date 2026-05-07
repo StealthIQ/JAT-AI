@@ -29,12 +29,12 @@ class Database:
         if self._mode == DBMode.SUPABASE and self._local:
             self._local = None
 
-    async def select(self, table: str, filters: dict[str, Any] | None = None, columns: str | None = None) -> list[dict]:
+    async def select(self, table: str, filters: dict[str, Any] | None = None, columns: str | None = None, order_by: str | None = None) -> list[dict]:
         if self._mode == DBMode.LOCAL:
-            return await self._local.select(table, filters, columns)
+            return await self._local.select(table, filters, columns, order_by)
         if self._mode == DBMode.SUPABASE:
-            return await self._remote_select(table, filters, columns)
-        return await self._local.select(table, filters, columns)
+            return await self._remote_select(table, filters, columns, order_by)
+        return await self._local.select(table, filters, columns, order_by)
 
     async def insert(self, table: str, data: dict[str, Any]) -> dict:
         if self._mode == DBMode.LOCAL:
@@ -72,7 +72,7 @@ class Database:
     def mode(self) -> str:
         return self._mode.value
 
-    async def _remote_select(self, table: str, filters: dict[str, Any] | None, columns: str | None = None) -> list[dict]:
+    async def _remote_select(self, table: str, filters: dict[str, Any] | None, columns: str | None = None, order_by: str | None = None) -> list[dict]:
         if not self._remote:
             return []
         cols = columns if columns else "*"
@@ -80,6 +80,10 @@ class Database:
         if filters:
             for k, v in filters.items():
                 query = query.eq(k, v)
+        if order_by:
+            desc = order_by.endswith(" DESC")
+            col = order_by.replace(" DESC", "").replace(" ASC", "").strip()
+            query = query.order(col, desc=desc)
         res = query.execute()
         return res.data or []
 

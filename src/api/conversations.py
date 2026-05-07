@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel
 
 from config import load_settings
@@ -30,7 +31,7 @@ class MessageCreate(BaseModel):
 @router.get("/api/conversations")
 async def list_conversations():
     try:
-        rows = await db.select("conversations", columns="id, title, mode, repo_owner, repo_name, model, status, created_at")
+        rows = await db.select("conversations", columns="id, title, mode, repo_owner, repo_name, model, status, created_at, updated_at", order_by="updated_at DESC")
     except Exception:
         return {"conversations": []}
     return {"conversations": rows}
@@ -51,7 +52,7 @@ async def create_conversation(body: ConversationCreate):
 @router.get("/api/conversations/{conv_id}/messages")
 async def get_messages(conv_id: str):
     try:
-        rows = await db.select("conversation_messages", filters={"conversation_id": conv_id})
+        rows = await db.select("conversation_messages", filters={"conversation_id": conv_id}, order_by="created_at ASC")
     except Exception:
         return {"messages": []}
     return {"messages": rows}
@@ -72,6 +73,10 @@ async def add_message(conv_id: str, body: MessageCreate):
         "content": body.content,
         "metadata": json.dumps(body.metadata) if body.metadata else "{}",
     })
+    try:
+        await db.update("conversations", {"updated_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")}, {"id": conv_id})
+    except Exception:
+        pass
     return row
 
 

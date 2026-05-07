@@ -153,7 +153,7 @@ class LocalDB:
         conn.commit()
         self._seed_prompts()
 
-    async def select(self, table: str, filters: dict[str, Any] | None = None, columns: str | None = None) -> list[dict]:
+    async def select(self, table: str, filters: dict[str, Any] | None = None, columns: str | None = None, order_by: str | None = None) -> list[dict]:
         conn = self._get_conn()
         cols = columns if columns else "*"
         where = ""
@@ -162,7 +162,8 @@ class LocalDB:
             clauses = [f"{k} = ?" for k in filters]
             where = " WHERE " + " AND ".join(clauses)
             params = list(filters.values())
-        cursor = conn.execute(f"SELECT {cols} FROM {table}{where}", params)
+        order = f" ORDER BY {order_by}" if order_by else ""
+        cursor = conn.execute(f"SELECT {cols} FROM {table}{where}{order}", params)
         rows = cursor.fetchall()
         return [dict(row) for row in rows]
 
