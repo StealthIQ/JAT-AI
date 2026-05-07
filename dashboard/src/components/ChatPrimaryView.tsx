@@ -310,6 +310,7 @@ export const ChatPrimaryView = () => {
         setActiveConvId(newConv.id);
       });
     setIsStarted(false);
+    setIsAnalyzing(false);
     exec.resetExecution();
   }, [exec, selectedModel, selectedProviderType, selectedRepo, mode]);
 
@@ -393,7 +394,7 @@ export const ChatPrimaryView = () => {
         <input className="chat-search" type="text" placeholder="Search chats..." value={chatSearch} onChange={(e) => setChatSearch(e.target.value)} />
         <div className="chat-conv-list">
           {conversations.filter((c) => c.title.toLowerCase().includes(chatSearch.toLowerCase())).map((c) => (
-            <button key={c.id} type="button" className={`chat-conv-item${activeConvId === c.id ? " is-active" : ""}`} onClick={() => { setActiveConvId(c.id); setIsStarted(c.messages.length > 0); }}>
+            <button key={c.id} type="button" className={`chat-conv-item${activeConvId === c.id ? " is-active" : ""}`} onClick={() => { setActiveConvId(c.id); setIsStarted(c.messages.length > 0); setIsAnalyzing(false); }}>
               <div className="chat-conv-row">
                 <span className="chat-conv-title">{c.title}</span>
                 <span className="chat-conv-id">{c.id.slice(-6)}</span>
