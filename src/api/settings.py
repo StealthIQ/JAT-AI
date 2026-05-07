@@ -25,7 +25,13 @@ async def get_summarizer_settings():
             import json
             return json.loads(rows[0].get("value", "{}"))
     except Exception:
-        pass
+        # Table may not exist yet — create it
+        try:
+            if hasattr(db, "_get_conn"):
+                db._get_conn().execute("CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL DEFAULT '{}')")
+                db._get_conn().commit()
+        except Exception:
+            pass
     return {"mode": "free", "provider": "", "model": "", "limit": 10}
 
 
