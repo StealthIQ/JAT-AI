@@ -2,8 +2,31 @@ from __future__ import annotations
 
 import json
 
+try:
+    import tiktoken
+    _enc = tiktoken.get_encoding("cl100k_base")
 
-def should_summarize(messages: list[dict], limit: int = 10) -> bool:
+    def count_tokens(text: str) -> int:
+        return len(_enc.encode(text))
+except ImportError:
+    def count_tokens(text: str) -> int:
+        # ~4 chars per token as rough approximation
+        return len(text) // 4
+
+
+def count_messages_tokens(messages: list[dict]) -> int:
+    total = 0
+    for msg in messages:
+        content = msg.get("content", "")
+        if isinstance(content, list):
+            content = " ".join(p.get("text", "") for p in content if isinstance(p, dict))
+        total += count_tokens(content) + 4  # role overhead
+    return total
+
+
+def should_summarize(messages: list[dict], limit: int = 10, token_limit: int = 0) -> bool:
+    if token_limit > 0:
+        return count_messages_tokens(messages) > token_limit
     return len(messages) > limit
 
 
@@ -13,9 +36,7 @@ def extract_summary(messages: list[dict]) -> str:
         role = msg.get("role", "")
         content = msg.get("content", "")
         if isinstance(content, list):
-            content = " ".join(
-                p.get("text", "") for p in content if isinstance(p, dict)
-            )
+            content = " ".join(p.get("text", "") for p in content if isinstance(p, dict))
         if not content:
             continue
         if role == "user":

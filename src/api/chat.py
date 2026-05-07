@@ -9,7 +9,7 @@ from config import load_settings
 from core.adaptive_context import detect_referenced_chunks, get_boosted_results, record_chunk_usage
 from core.context_compressor import compress_context
 from core.conversation_summarizer import build_summarized_history, build_ai_summarized_history, should_summarize, get_summarizer_config
-from core.rag_store import store_context
+from core.rag_store import store_context, store_conversation_exchange, query_conversation_context
 from db import db
 
 router = APIRouter()
@@ -235,8 +235,9 @@ async def chat_send(request: ChatRequest):
 
     summarizer_cfg = await get_summarizer_config()
     limit = summarizer_cfg.get("limit", 10)
+    token_limit = summarizer_cfg.get("token_limit", 0)
 
-    if should_summarize(raw_messages, limit):
+    if should_summarize(raw_messages, limit, token_limit):
         if summarizer_cfg.get("mode") == "ai" and summarizer_cfg.get("provider") and summarizer_cfg.get("model"):
             raw_messages = await build_ai_summarized_history(
                 raw_messages, summarizer_cfg["provider"], summarizer_cfg["model"]
@@ -269,6 +270,14 @@ async def chat_send(request: ChatRequest):
                 rag_block = "\n---\n".join(compressed)
                 system += f"\n\n<relevant_context>\n{rag_block}\n</relevant_context>"
 
+            try:
+                conv_chunks = await query_conversation_context(parts[0], parts[1], user_query, n_results=3)
+            except Exception:
+                conv_chunks = []
+            if conv_chunks:
+                conv_block = "\n---\n".join(conv_chunks)
+                system += f"\n\n<past_conversations>\n{conv_block}\n</past_conversations>"
+
     system += THINK_INSTRUCTION
 
     last_error = ""
@@ -294,6 +303,14 @@ async def chat_send(request: ChatRequest):
                         collection = request.repo.replace("/", "__")
                         chunk_ids = [f"{collection}_{hash(c[:100]) & 0xFFFFFFFF}" for c in referenced]
                         await record_chunk_usage(collection, chunk_ids)
+                except Exception:
+                    pass
+
+            if request.repo and request.messages:
+                try:
+                    parts = request.repo.split("/", 1)
+                    user_content = request.messages[-1].content if request.messages else ""
+                    await store_conversation_exchange(parts[0], parts[1], user_content, response[:2000])
                 except Exception:
                     pass
 

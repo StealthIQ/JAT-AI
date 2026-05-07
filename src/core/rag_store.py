@@ -156,3 +156,57 @@ def get_chunk_count(owner: str, repo: str) -> int:
     if collection is None:
         return 0
     return collection.count()
+
+
+async def store_conversation_exchange(
+    owner: str, repo: str, user_msg: str, assistant_msg: str, conversation_id: str = ""
+) -> None:
+    if chromadb is None:
+        return
+    collection = _get_collection(owner, repo)
+    if collection is None:
+        return
+
+    exchange_text = f"USER: {user_msg}\nASSISTANT: {assistant_msg}"
+    chunks = _chunk_text(exchange_text, max_size=1200)
+    if not chunks:
+        return
+
+    exchange_id = str(uuid.uuid4())
+    ids = [f"conv_{exchange_id}_{i}" for i in range(len(chunks))]
+    metadatas = [
+        {"type": "conversation", "conversation_id": conversation_id, "chunk_index": i}
+        for i in range(len(chunks))
+    ]
+
+    def _store():
+        collection.add(documents=chunks, ids=ids, metadatas=metadatas)
+
+    await asyncio.to_thread(_store)
+
+
+async def query_conversation_context(
+    owner: str, repo: str, query: str, n_results: int = 3
+) -> list[str]:
+    if chromadb is None:
+        return []
+    collection = _get_collection(owner, repo)
+    if collection is None:
+        return []
+
+    def _query():
+        count = collection.count()
+        if count == 0:
+            return []
+        n = min(n_results, count)
+        results = collection.query(
+            query_texts=[query],
+            n_results=n,
+            where={"type": "conversation"},
+        )
+        return results.get("documents", [[]])[0]
+
+    try:
+        return await asyncio.to_thread(_query)
+    except Exception:
+        return []
