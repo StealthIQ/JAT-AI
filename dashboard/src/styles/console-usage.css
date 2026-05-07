@@ -81,7 +81,7 @@
 
 .usage-sections-row {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: 40% 20% 20% 20%;
   gap: 0.8rem;
 }
 
