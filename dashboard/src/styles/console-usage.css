@@ -84,6 +84,7 @@
   grid-template-columns: 2fr 1fr 1fr 1fr;
   gap: 0.8rem;
   min-width: 0;
+  flex: 1;
 }
 
 .usage-section {
