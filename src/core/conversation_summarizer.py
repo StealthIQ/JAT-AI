@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
 
-def should_summarize(messages: list[dict]) -> bool:
-    return len(messages) > 10
+
+def should_summarize(messages: list[dict], limit: int = 10) -> bool:
+    return len(messages) > limit
 
 
 def extract_summary(messages: list[dict]) -> str:
@@ -38,3 +40,51 @@ def build_summarized_history(messages: list[dict], keep_recent: int = 4) -> list
         "content": f"[Conversation summary]\n{summary}",
     }
     return [summary_msg] + recent
+
+
+async def build_ai_summarized_history(
+    messages: list[dict],
+    provider_type: str,
+    model: str,
+    keep_recent: int = 4,
+) -> list[dict]:
+    if len(messages) <= keep_recent:
+        return messages
+
+    older = messages[:-keep_recent]
+    recent = messages[-keep_recent:]
+
+    conversation_text = "\n".join(
+        f"{m.get('role', 'unknown').upper()}: {m.get('content', '')[:500]}"
+        for m in older
+    )
+
+    try:
+        from api.chat import _call_provider
+
+        summary_prompt = [
+            {"role": "system", "content": "Summarize this conversation into a concise paragraph capturing key topics, decisions, and context. Be brief but preserve important details."},
+            {"role": "user", "content": conversation_text[:8000]},
+        ]
+
+        response = await _call_provider(provider_type, model, summary_prompt)
+        summary_text = response if isinstance(response, str) else str(response)
+    except Exception:
+        summary_text = extract_summary(older)
+
+    summary_msg = {
+        "role": "system",
+        "content": f"[AI-generated conversation summary]\n{summary_text}",
+    }
+    return [summary_msg] + recent
+
+
+async def get_summarizer_config() -> dict:
+    try:
+        from db import db
+        rows = await db.select("app_settings", filters={"key": "summarizer_config"})
+        if rows:
+            return json.loads(rows[0].get("value", "{}"))
+    except Exception:
+        pass
+    return {"mode": "free", "provider": "", "model": "", "limit": 10}

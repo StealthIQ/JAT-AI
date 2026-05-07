@@ -128,6 +128,10 @@ class LocalDB:
                 created_at TEXT DEFAULT (datetime('now')),
                 FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
             );
+            CREATE TABLE IF NOT EXISTS app_settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL DEFAULT '{}'
+            );
         """
 
     def _seed_prompts(self) -> None:

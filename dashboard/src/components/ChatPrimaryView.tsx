@@ -108,6 +108,12 @@ export const ChatPrimaryView = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteInput, setDeleteInput] = useState("");
   const [unreadConvIds, setUnreadConvIds] = useState<Set<string>>(new Set());
+  const [showSummarizerSettings, setShowSummarizerSettings] = useState(false);
+  const [summarizerMode, setSummarizerMode] = useState<"free" | "ai">("free");
+  const [summarizerProvider, setSummarizerProvider] = useState("");
+  const [summarizerModel, setSummarizerModel] = useState("");
+  const [summarizerModels, setSummarizerModels] = useState<{ id: string; name: string; context_length?: number }[]>([]);
+  const [summarizerLimit, setSummarizerLimit] = useState(10);
 
   const tasks = useLiveTaskStatus();
   const activeConv = conversations.find((c) => c.id === activeConvId) ?? null;
@@ -196,6 +202,15 @@ export const ChatPrimaryView = () => {
       const names = (d.repos ?? []).map((r: { name: string }) => r.name);
       setRepos(names);
       if (names.length > 0) setSelectedRepo(names[0]);
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/settings/summarizer").then((r) => r.json()).then((d) => {
+      if (d.mode) setSummarizerMode(d.mode);
+      if (d.provider) setSummarizerProvider(d.provider);
+      if (d.model) setSummarizerModel(d.model);
+      if (d.limit) setSummarizerLimit(d.limit);
     }).catch(() => {});
   }, []);
 
@@ -545,6 +560,12 @@ export const ChatPrimaryView = () => {
               <TaskListPanel tasks={tasks} visible={showTasks} />
             </div>
             <div className={`chat-input-bar${!chatEnabled ? " chat-input-bar--disabled" : ""}`}>
+              <button type="button" className="chat-settings-btn" onClick={() => setShowSummarizerSettings(true)} title="Summarizer settings">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                </svg>
+              </button>
               <input ref={imageInputRef} type="file" accept="image/*" className="chat-image-input-hidden" onChange={handleImageChange} />
               <button type="button" className="chat-image-btn" onClick={() => imageInputRef.current?.click()} title="Attach image">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -562,6 +583,83 @@ export const ChatPrimaryView = () => {
               <input className="chat-input" type="text" placeholder={chatEnabled ? "Type a message..." : "Click Start to begin"} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleSend(); }} disabled={!chatEnabled} />
               <button type="button" className="chat-send-btn" onClick={handleSend} disabled={!input.trim() || isTyping || !chatEnabled}>Send</button>
             </div>
+            {showSummarizerSettings && (
+              <div className="chat-summarizer-popup">
+                <div className="chat-summarizer-popup-inner">
+                  <div className="chat-summarizer-header">
+                    <h4>Context Summarizer</h4>
+                    <button type="button" className="chat-summarizer-close" onClick={() => setShowSummarizerSettings(false)}>x</button>
+                  </div>
+                  <div className="chat-summarizer-modes">
+                    <button type="button" className={`chat-summarizer-mode-btn${summarizerMode === "free" ? " is-active" : ""}`} onClick={() => setSummarizerMode("free")}>
+                      Free (Rule-based)
+                    </button>
+                    <button type="button" className={`chat-summarizer-mode-btn${summarizerMode === "ai" ? " is-active" : ""}`} onClick={() => setSummarizerMode("ai")}>
+                      AI-powered
+                    </button>
+                  </div>
+                  {summarizerMode === "free" && (
+                    <div className="chat-summarizer-section">
+                      <p className="chat-summarizer-desc">Mechanical summarization. Truncates older messages into bullet points. No API calls, no cost.</p>
+                      <label className="chat-summarizer-label">
+                        Summarize after
+                        <input type="number" min={4} max={50} value={summarizerLimit} onChange={(e) => setSummarizerLimit(Number(e.target.value))} className="chat-summarizer-input" />
+                        messages
+                      </label>
+                    </div>
+                  )}
+                  {summarizerMode === "ai" && (
+                    <div className="chat-summarizer-section">
+                      <p className="chat-summarizer-desc">Uses an AI model to generate high-quality summaries. Costs tokens but retains nuance.</p>
+                      <label className="chat-summarizer-label">Provider</label>
+                      <select className="chat-summarizer-select" value={summarizerProvider} onChange={(e) => {
+                        setSummarizerProvider(e.target.value);
+                        const group = providerTypes.find((g) => g.type === e.target.value);
+                        if (group && group.ids.length > 0) {
+                          fetch(`/api/providers/${group.ids[0]}/models`).then((r) => r.json()).then((d) => {
+                            setSummarizerModels(d.models ?? []);
+                            if (d.models?.length > 0) setSummarizerModel(d.models[0].id);
+                          }).catch(() => {});
+                        }
+                      }}>
+                        <option value="">Select provider</option>
+                        {providerTypes.map((g) => <option key={g.type} value={g.type}>{g.type.replace("_", " ").toUpperCase()}</option>)}
+                      </select>
+                      <label className="chat-summarizer-label">Model</label>
+                      <select className="chat-summarizer-select" value={summarizerModel} onChange={(e) => setSummarizerModel(e.target.value)}>
+                        <option value="">Select model</option>
+                        {summarizerModels.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                      </select>
+                      {summarizerModel && (() => {
+                        const sel = summarizerModels.find((m) => m.id === summarizerModel);
+                        const ctx = sel?.context_length;
+                        const estimatedMsgs = ctx ? Math.floor(ctx / 800) : null;
+                        return (
+                          <div className="chat-summarizer-info">
+                            {ctx && <span>Context window: {ctx.toLocaleString()} tokens</span>}
+                            {estimatedMsgs && <span>Can summarize ~{estimatedMsgs} messages</span>}
+                          </div>
+                        );
+                      })()}
+                      <label className="chat-summarizer-label">
+                        Summarize after
+                        <input type="number" min={4} max={50} value={summarizerLimit} onChange={(e) => setSummarizerLimit(Number(e.target.value))} className="chat-summarizer-input" />
+                        messages
+                      </label>
+                    </div>
+                  )}
+                  <div className="chat-summarizer-footer">
+                    <button type="button" className="chat-summarizer-save" onClick={() => {
+                      fetch("/api/settings/summarizer", {
+                        method: "POST", headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ mode: summarizerMode, provider: summarizerProvider, model: summarizerModel, limit: summarizerLimit }),
+                      }).catch(() => {});
+                      setShowSummarizerSettings(false);
+                    }}>Save</button>
+                  </div>
+                </div>
+              </div>
+            )}
           </>
         ) : (
           <div className="chat-empty">Select a conversation or start a new one.</div>

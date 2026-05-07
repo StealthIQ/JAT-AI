@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from config import load_settings
 from core.adaptive_context import detect_referenced_chunks, get_boosted_results, record_chunk_usage
 from core.context_compressor import compress_context
-from core.conversation_summarizer import build_summarized_history, should_summarize
+from core.conversation_summarizer import build_summarized_history, build_ai_summarized_history, should_summarize, get_summarizer_config
 from core.rag_store import store_context
 from db import db
 
@@ -232,8 +232,17 @@ async def chat_send(request: ChatRequest):
         raise HTTPException(400, f"No enabled keys for provider: {request.provider_type}")
 
     raw_messages = [{"role": m.role, "content": m.content} for m in request.messages]
-    if should_summarize(raw_messages):
-        raw_messages = build_summarized_history(raw_messages)
+
+    summarizer_cfg = await get_summarizer_config()
+    limit = summarizer_cfg.get("limit", 10)
+
+    if should_summarize(raw_messages, limit):
+        if summarizer_cfg.get("mode") == "ai" and summarizer_cfg.get("provider") and summarizer_cfg.get("model"):
+            raw_messages = await build_ai_summarized_history(
+                raw_messages, summarizer_cfg["provider"], summarizer_cfg["model"]
+            )
+        else:
+            raw_messages = build_summarized_history(raw_messages)
         request_copy = request.model_copy()
         request_copy.messages = [ChatMessage(role=m["role"], content=m["content"]) for m in raw_messages]
         messages = _build_messages(request_copy)
