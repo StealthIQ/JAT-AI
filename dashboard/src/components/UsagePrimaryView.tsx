@@ -41,7 +41,7 @@ const StatCard = ({ label, value, sub }: { label: string; value: string; sub?: s
 const DailyLineGraph = ({ daily }: { daily: UsageStats["daily"] }) => {
   if (daily.length === 0) return <p className="usage-empty">No daily data yet</p>;
 
-  const w = 400, h = 120, pad = 24;
+  const w = 500, h = 200, pad = 30;
   const maxVal = Math.max(...daily.map((d) => d.input_tokens + d.output_tokens), 1);
   const stepX = (w - pad * 2) / Math.max(daily.length - 1, 1);
 
