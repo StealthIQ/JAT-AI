@@ -72,29 +72,6 @@ const DailyLineGraph = ({ daily }: { daily: UsageStats["daily"] }) => {
   );
 };
 
-const DailyBarChart = ({ daily }: { daily: UsageStats["daily"] }) => {
-  if (daily.length === 0) return null;
-  const maxVal = Math.max(...daily.map((d) => d.input_tokens + d.output_tokens), 1);
-
-  return (
-    <div className="usage-daily-chart">
-      {daily.map((day) => {
-        const total = day.input_tokens + day.output_tokens;
-        const height = Math.max(4, (total / maxVal) * 80);
-        const inputPct = total > 0 ? (day.input_tokens / total) * 100 : 50;
-        return (
-          <div key={day.date} className="usage-daily-bar-col" title={`${day.date}: ${total.toLocaleString()} tokens (${day.requests} req)`}>
-            <div className="usage-daily-bar" style={{ height: `${height}px` }}>
-              <div className="usage-daily-bar-input" style={{ height: `${inputPct}%` }} />
-              <div className="usage-daily-bar-output" style={{ height: `${100 - inputPct}%` }} />
-            </div>
-            <span className="usage-daily-bar-label">{day.date.slice(5)}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-};
 
 
 export const UsagePrimaryView = () => {
@@ -147,13 +124,12 @@ export const UsagePrimaryView = () => {
         <StatCard label="Est. Cost" value={`$${totalCost.toFixed(4)}`} sub="equivalent market rate" />
       </div>
 
-      <div className="usage-graph-section">
-        <h3>Daily Token Usage (7 Days)</h3>
-        <DailyLineGraph daily={stats.daily} />
-        <DailyBarChart daily={stats.daily} />
-      </div>
-
       <div className="usage-sections-row">
+        <div className="usage-section">
+          <h3>Daily (7 Days)</h3>
+          <DailyLineGraph daily={stats.daily} />
+        </div>
+
         <div className="usage-section">
           <h3>By Provider</h3>
           <div className="usage-breakdown-list">
@@ -207,27 +183,6 @@ export const UsagePrimaryView = () => {
             {Object.keys(stats.by_provider).length === 0 && <p className="usage-empty">No cost data yet</p>}
           </div>
         </div>
-      </div>
-
-      <div className="usage-section usage-recent">
-        <h3>Recent Requests</h3>
-        <table className="usage-table">
-          <thead>
-            <tr><th>Provider</th><th>Model</th><th>Input</th><th>Output</th><th>Time</th></tr>
-          </thead>
-          <tbody>
-            {stats.recent.map((r, i) => (
-              <tr key={i}>
-                <td>{r.provider}</td>
-                <td>{r.model}</td>
-                <td>{r.input?.toLocaleString()}</td>
-                <td>{r.output?.toLocaleString()}</td>
-                <td>{r.at ? new Date(r.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "-"}</td>
-              </tr>
-            ))}
-            {stats.recent.length === 0 && <tr><td colSpan={5} className="usage-empty">No requests yet</td></tr>}
-          </tbody>
-        </table>
       </div>
     </section>
   );
