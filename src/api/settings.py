@@ -48,3 +48,14 @@ async def save_summarizer_settings(body: SummarizerConfig):
     except Exception:
         pass
     return {"ok": True}
+
+
+@router.get("/api/settings/status")
+async def get_settings_status():
+    import os
+    gh_token = os.getenv("GITHUB_TOKEN", "")
+    gh_fg_token = os.getenv("GITHUB_FG_TOKEN", "")
+    return {
+        "github_token": {"status": "active" if gh_token else "missing"},
+        "github_fg_token": {"status": "active" if gh_fg_token else "missing"},
+    }
