@@ -13,6 +13,7 @@ export type LiveTask = {
 export function useLiveTaskStatus() {
   const [tasks, setTasks] = useState<LiveTask[]>([]);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastJsonRef = useRef("");
 
   useEffect(() => {
     const fetchTasks = () => {
@@ -20,7 +21,7 @@ export function useLiveTaskStatus() {
         .then((r) => r.json())
         .then((data) => {
           if (!Array.isArray(data)) return;
-          setTasks(data.map((t: any) => ({
+          const mapped = data.map((t: any) => ({
             id: t.terminalId ?? t.id ?? "",
             status: t.state === "live" ? "running" : (t.state === "queued" ? "pending" : "completed"),
             repo_owner: (t.tentacleId ?? "").split("/")[0] ?? "",
@@ -28,7 +29,12 @@ export function useLiveTaskStatus() {
             prompt: t.label ?? t.tentacleName ?? "",
             session_id: t.sessionId ?? null,
             updated_at: t.createdAt ?? "",
-          })));
+          }));
+          const json = JSON.stringify(mapped);
+          if (json !== lastJsonRef.current) {
+            lastJsonRef.current = json;
+            setTasks(mapped);
+          }
         })
         .catch(() => {});
     };

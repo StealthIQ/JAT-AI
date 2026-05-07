@@ -15,6 +15,7 @@ from api.repos import router as repos_router
 from api.execute import router as execute_router
 from api.conversations import router as conversations_router
 from api.settings import router as settings_router
+from api.usage import router as usage_router
 from config import load_settings
 from db import db
 
@@ -47,6 +48,7 @@ app.include_router(repos_router)
 app.include_router(execute_router)
 app.include_router(conversations_router)
 app.include_router(settings_router)
+app.include_router(usage_router)
 
 
 class PromptCreate(BaseModel):

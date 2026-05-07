@@ -9,6 +9,7 @@ import { ChatPrimaryView } from "./ChatPrimaryView";
 import { PromptsPrimaryView } from "./PromptsPrimaryView";
 import { ReposPrimaryView } from "./ReposPrimaryView";
 import { SettingsPrimaryView } from "./SettingsPrimaryView";
+import { UsagePrimaryView } from "./UsagePrimaryView";
 
 type PrimaryViewRouterProps = {
   activePrimaryNav: PrimaryNavIndex;
@@ -69,6 +70,10 @@ export const PrimaryViewRouter = ({
   }
 
   if (activePrimaryNav === 7) {
+    return <UsagePrimaryView />;
+  }
+
+  if (activePrimaryNav === 8) {
     return <SettingsPrimaryView {...settingsPrimaryViewProps} />;
   }
 

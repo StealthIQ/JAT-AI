@@ -13,7 +13,8 @@ export const PRIMARY_NAV_ITEMS = [
   { index: 4, label: "Chat" },
   { index: 5, label: "Prompts" },
   { index: 6, label: "APIs" },
-  { index: 7, label: "Settings" },
+  { index: 7, label: "Usage" },
+  { index: 8, label: "Settings" },
 ] as const;
 
 export const GITHUB_COMMIT_SERIES_LENGTH = 30;

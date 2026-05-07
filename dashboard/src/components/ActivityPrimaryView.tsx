@@ -29,7 +29,7 @@ export const ActivityPrimaryView = ({
           <div className="apis-setup-card">
             <h3>GitHub API Key Required</h3>
             <p>Configure your GitHub token in Settings to view activity data, commits, and repository stats.</p>
-            <button type="button" className="apis-setup-btn" onClick={() => { window.dispatchEvent(new CustomEvent("navigate", { detail: 7 })); }}>
+            <button type="button" className="apis-setup-btn" onClick={() => { window.dispatchEvent(new CustomEvent("navigate", { detail: 8 })); }}>
               Go to Settings
             </button>
           </div>

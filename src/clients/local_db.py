@@ -132,6 +132,15 @@ class LocalDB:
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL DEFAULT '{}'
             );
+            CREATE TABLE IF NOT EXISTS token_usage (
+                id TEXT PRIMARY KEY,
+                provider_type TEXT NOT NULL DEFAULT '',
+                model TEXT NOT NULL DEFAULT '',
+                input_tokens INTEGER DEFAULT 0,
+                output_tokens INTEGER DEFAULT 0,
+                conversation_id TEXT DEFAULT '',
+                created_at TEXT DEFAULT (datetime('now'))
+            );
         """
 
     def _seed_prompts(self) -> None:

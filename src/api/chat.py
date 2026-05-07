@@ -320,6 +320,21 @@ async def chat_send(request: ChatRequest):
                 except Exception:
                     pass
 
+            try:
+                from core.conversation_summarizer import count_tokens
+                input_text = system + " ".join(m.get("content", "") for m in messages)
+                input_toks = count_tokens(input_text)
+                output_toks = count_tokens(response)
+                await db.insert("token_usage", {
+                    "provider_type": request.provider_type,
+                    "model": request.model,
+                    "input_tokens": input_toks,
+                    "output_tokens": output_toks,
+                    "conversation_id": "",
+                })
+            except Exception:
+                pass
+
             return ChatResponse(
                 response=response,
                 provider_id=provider_id,
