@@ -47,35 +47,21 @@ export const PrimaryViewRouter = ({
   promptsEnabled,
   onPromptsSidebarContent,
 }: PrimaryViewRouterProps) => {
-  if (activePrimaryNav === 2) {
-    return <ReposPrimaryView />;
-  }
-
-  if (activePrimaryNav === 3) {
-    return <ActivityPrimaryView {...activityPrimaryViewProps} />;
-  }
-
-  if (activePrimaryNav === 4) {
-    return <ChatPrimaryView />;
-  }
-
-  if (activePrimaryNav === 5) {
-    return (
-      <PromptsPrimaryView enabled={promptsEnabled} onSidebarContent={onPromptsSidebarContent} />
-    );
-  }
-
-  if (activePrimaryNav === 6) {
-    return <ApisPrimaryView />;
-  }
-
-  if (activePrimaryNav === 7) {
-    return <UsagePrimaryView />;
-  }
-
-  if (activePrimaryNav === 8) {
-    return <SettingsPrimaryView {...settingsPrimaryViewProps} />;
-  }
-
-  return <CanvasPrimaryView {...canvasPrimaryViewProps} />;
+  return (
+    <>
+      {/* Chat stays mounted to preserve dropdown/model state across tab switches */}
+      <div style={{ display: activePrimaryNav === 4 ? "contents" : "none" }}>
+        <ChatPrimaryView />
+      </div>
+      {activePrimaryNav === 2 && <ReposPrimaryView />}
+      {activePrimaryNav === 3 && <ActivityPrimaryView {...activityPrimaryViewProps} />}
+      {activePrimaryNav === 5 && (
+        <PromptsPrimaryView enabled={promptsEnabled} onSidebarContent={onPromptsSidebarContent} />
+      )}
+      {activePrimaryNav === 6 && <ApisPrimaryView />}
+      {activePrimaryNav === 7 && <UsagePrimaryView />}
+      {activePrimaryNav === 8 && <SettingsPrimaryView {...settingsPrimaryViewProps} />}
+      {activePrimaryNav === 1 && <CanvasPrimaryView {...canvasPrimaryViewProps} />}
+    </>
+  );
 };

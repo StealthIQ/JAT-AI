@@ -174,6 +174,8 @@ export const ChatPrimaryView = () => {
       next.delete(activeConvId);
       return next;
     });
+    const conv = conversations.find((c) => c.id === activeConvId);
+    if (conv?.model) setSelectedModel(conv.model);
   }, [activeConvId]);
 
   useEffect(() => {
@@ -198,8 +200,15 @@ export const ChatPrimaryView = () => {
     setModelsLoading(true);
     setModels([]);
     fetch(`/api/providers/${group.ids[0]}/models`).then((r) => r.json()).then((d) => {
-      setModels(d.models ?? []);
-      if (d.models?.length > 0) setSelectedModel(d.models[0].id);
+      const modelList = d.models ?? [];
+      setModels(modelList);
+      // Only change model if current selection isn't in the new list
+      if (modelList.length > 0) {
+        setSelectedModel((prev) => {
+          if (prev && modelList.some((m: { id: string }) => m.id === prev)) return prev;
+          return modelList[0].id;
+        });
+      }
       const lim = d.limits ?? {};
       setUsage((u) => ({ ...u, rpmLimit: (lim.rpm ?? 40) * group.keyCount, tokensLimit: (lim.rpd ?? 0) * group.keyCount }));
     }).catch(() => {}).finally(() => setModelsLoading(false));
@@ -209,7 +218,7 @@ export const ChatPrimaryView = () => {
     fetch("/api/github/repos").then((r) => r.json()).then((d) => {
       const names = (d.repos ?? []).map((r: { name: string }) => r.name);
       setRepos(names);
-      if (names.length > 0) setSelectedRepo(names[0]);
+      if (names.length > 0) setSelectedRepo((prev) => prev && names.includes(prev) ? prev : names[0]);
     }).catch(() => {});
   }, []);
 
