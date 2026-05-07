@@ -34,11 +34,15 @@ export const ReposPrimaryView = () => {
   const [hasGithubKey, setHasGithubKey] = useState(true);
 
   useEffect(() => {
-    fetch("/api/settings/status").then((r) => r.json()).then((d) => {
+    fetch("/api/settings/status").then((r) => {
+      if (!r.ok) { setHasGithubKey(true); return null; }
+      return r.json();
+    }).then((d) => {
+      if (!d) return;
       const ghClassic = d.github_token?.status === "active";
       const ghFg = d.github_fg_token?.status === "active";
       setHasGithubKey(ghClassic || ghFg);
-    }).catch(() => {});
+    }).catch(() => setHasGithubKey(true));
   }, []);
 
   const fetchRepos = useCallback(async () => {

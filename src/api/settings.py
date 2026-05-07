@@ -52,7 +52,9 @@ async def save_summarizer_settings(body: SummarizerConfig):
 
 @router.get("/api/settings/status")
 async def get_settings_status():
+    from dotenv import load_dotenv
     import os
+    load_dotenv()
     gh_token = os.getenv("GITHUB_TOKEN", "")
     gh_fg_token = os.getenv("GITHUB_FG_TOKEN", "")
     return {
