@@ -52,11 +52,16 @@ async def save_summarizer_settings(body: SummarizerConfig):
 
 @router.get("/api/settings/status")
 async def get_settings_status():
-    from dotenv import load_dotenv
+    from pathlib import Path
+    from dotenv import dotenv_values
+
+    env_path = Path(__file__).resolve().parent.parent.parent / ".env"
+    values = dotenv_values(str(env_path)) if env_path.exists() else {}
+
     import os
-    load_dotenv()
-    gh_token = os.getenv("GITHUB_TOKEN", "")
-    gh_fg_token = os.getenv("GITHUB_FG_TOKEN", "")
+    gh_token = os.getenv("GITHUB_TOKEN", "") or values.get("GITHUB_TOKEN", "")
+    gh_fg_token = os.getenv("GITHUB_FG_TOKEN", "") or values.get("GITHUB_FG_TOKEN", "")
+
     return {
         "github_token": {"status": "active" if gh_token else "missing"},
         "github_fg_token": {"status": "active" if gh_fg_token else "missing"},
