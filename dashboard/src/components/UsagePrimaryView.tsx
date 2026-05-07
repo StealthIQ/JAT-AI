@@ -58,10 +58,10 @@ const DailyLineGraph = ({ daily }: { daily: UsageStats["daily"] }) => {
         <polyline points={inputPoints} fill="none" stroke="#00e5ff" strokeWidth="2" />
         <polyline points={outputPoints} fill="none" stroke="#a855f7" strokeWidth="2" />
         {daily.map((d, i) => (
-          <text key={d.date} x={pad + i * stepX} y={h - 6} textAnchor="middle" fill="#5a6a7e" fontSize="8">{d.date.slice(5)}</text>
+          <text key={d.date} x={pad + i * stepX} y={h - 6} textAnchor="middle" fill="#e6e8ec" fontSize="8">{d.date.slice(5)}</text>
         ))}
-        <text x={pad - 4} y={pad + 4} textAnchor="end" fill="#5a6a7e" fontSize="7">{maxVal.toLocaleString()}</text>
-        <text x={pad - 4} y={h - pad} textAnchor="end" fill="#5a6a7e" fontSize="7">0</text>
+        <text x={pad - 4} y={pad + 4} textAnchor="end" fill="#e6e8ec" fontSize="7">{maxVal.toLocaleString()}</text>
+        <text x={pad - 4} y={h - pad} textAnchor="end" fill="#e6e8ec" fontSize="7">0</text>
       </svg>
       <div className="usage-graph-legend">
         <span className="usage-legend-input">Input</span>
