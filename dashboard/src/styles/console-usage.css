@@ -81,8 +81,9 @@
 
 .usage-sections-row {
   display: grid;
-  grid-template-columns: 40% 20% 20% 20%;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
   gap: 0.8rem;
+  min-width: 0;
 }
 
 .usage-section {
@@ -90,6 +91,8 @@
   border: 1px solid #2b2f36;
   border-radius: 6px;
   padding: 0.8rem;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .usage-section h3 {
