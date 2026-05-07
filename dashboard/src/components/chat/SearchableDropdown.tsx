@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 
 type Props = {
   items: { id: string; label: string }[];
@@ -10,7 +10,7 @@ type Props = {
   displayValue?: string;
 };
 
-export const SearchableDropdown = ({
+export const SearchableDropdown = memo(({
   items,
   selected,
   onSelect,
@@ -79,4 +79,4 @@ export const SearchableDropdown = ({
       )}
     </div>
   );
-};
+});

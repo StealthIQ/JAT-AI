@@ -59,6 +59,13 @@ async def get_messages(conv_id: str):
 
 @router.post("/api/conversations/{conv_id}/messages")
 async def add_message(conv_id: str, body: MessageCreate):
+    # Ensure conversation exists (handles legacy local IDs)
+    try:
+        existing = await db.select("conversations", filters={"id": conv_id})
+        if not existing:
+            await db.insert("conversations", {"id": conv_id, "title": "Untitled", "mode": "ask"})
+    except Exception:
+        pass
     row = await db.insert("conversation_messages", {
         "conversation_id": conv_id,
         "role": body.role,
