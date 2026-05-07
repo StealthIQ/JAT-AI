@@ -120,7 +120,7 @@ export const UsagePrimaryView = () => {
         <StatCard label="Total Tokens" value={(stats.total.input_tokens + stats.total.output_tokens).toLocaleString()} sub={`${stats.total.requests} requests`} />
         <StatCard label="Input Tokens" value={stats.total.input_tokens.toLocaleString()} sub="prompts + context" />
         <StatCard label="Output Tokens" value={stats.total.output_tokens.toLocaleString()} sub="AI responses" />
-        <StatCard label="Today" value={(stats.today.input_tokens + stats.today.output_tokens).toLocaleString()} sub={`${stats.today.requests} requests today`} />
+        <StatCard label="Today" value={`${stats.today.requests}`} sub={`${(stats.today.input_tokens + stats.today.output_tokens).toLocaleString()} tokens today`} />
         <StatCard label="Est. Cost" value={`$${totalCost.toFixed(4)}`} sub="equivalent market rate" />
       </div>
 
