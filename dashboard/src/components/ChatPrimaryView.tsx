@@ -474,7 +474,9 @@ export const ChatPrimaryView = () => {
       const plan = JSON.parse(jsonMatch[1]);
       if (!plan.tasks) return null;
       const before = text.slice(0, text.indexOf("```json")).trim();
-      const after = text.slice(text.indexOf("```", text.indexOf("```json") + 7) + 3).trim();
+      let after = text.slice(text.indexOf("```", text.indexOf("```json") + 7) + 3).trim();
+      // Strip action tags and any trailing raw JSON from the "after" portion
+      after = after.replace(/\[ACTION:\w+(?::[^\]]*)?\]/g, "").replace(/\{[\s\S]*"tasks"[\s\S]*\}$/m, "").trim();
       let html = before ? marked.parse(before) as string : "";
       html += `<div class="chat-plan-tasks">`;
       for (const task of plan.tasks) {
