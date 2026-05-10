@@ -48,6 +48,10 @@ export function useExecutionActions(
     const lastAssistant = [...activeConv.messages].reverse().find((m) => m.role === "assistant");
     if (!lastAssistant) return;
 
+    // Extract JSON plan from the message (may be wrapped in ```json ... ```)
+    const jsonMatch = lastAssistant.content.match(/```json\s*([\s\S]*?)```/);
+    const planJson = jsonMatch ? jsonMatch[1].trim() : lastAssistant.content;
+
     setIsExecuting(true);
     setExecutionStatus("Dispatching tasks to Jules...");
     setPlanReady(false);
@@ -56,7 +60,7 @@ export function useExecutionActions(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        plan_json: lastAssistant.content,
+        plan_json: planJson,
         repo_owner: "iceyxsm",
         repo_name: selectedRepo,
       }),
