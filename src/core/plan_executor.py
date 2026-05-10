@@ -165,4 +165,13 @@ async def get_jules_key() -> str | None:
     daily_limit = best.get("max_daily_tasks", 300)
     if best.get("sessions_today", 0) >= daily_limit:
         return None
-    return best.get("api_key_encrypted", "")
+    encrypted = best.get("api_key_encrypted", "")
+    if not encrypted:
+        return None
+    from core.ai_interface import KeyVault
+    from config import load_settings
+    vault = KeyVault(load_settings().encryption_key)
+    try:
+        return vault.decrypt(encrypted)
+    except Exception:
+        return encrypted
