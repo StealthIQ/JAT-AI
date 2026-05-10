@@ -89,6 +89,9 @@ def main():
     print("  ========================================")
     print()
 
+    import webbrowser
+    webbrowser.open(url)
+
     try:
         backend.wait()
     except KeyboardInterrupt:
