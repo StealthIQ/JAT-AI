@@ -141,6 +141,15 @@ class LocalDB:
                 conversation_id TEXT DEFAULT '',
                 created_at TEXT DEFAULT (datetime('now'))
             );
+            CREATE TABLE IF NOT EXISTS plans (
+                id TEXT PRIMARY KEY,
+                conversation_id TEXT NOT NULL,
+                title TEXT DEFAULT '',
+                plan_json TEXT NOT NULL DEFAULT '{}',
+                status TEXT DEFAULT 'draft',
+                created_at TEXT DEFAULT (datetime('now')),
+                updated_at TEXT DEFAULT (datetime('now'))
+            );
         """
 
     def _seed_prompts(self) -> None:

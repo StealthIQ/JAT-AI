@@ -70,6 +70,8 @@ type Conversation = {
   updatedAt: string;
   providerId?: string;
   model?: string;
+  repo?: string;
+  providerType?: string;
 };
 
 type ProviderGroup = { type: string; keyCount: number; ids: string[] };
@@ -122,6 +124,14 @@ export const ChatPrimaryView = () => {
   const [summarizerModel, setSummarizerModel] = useState("");
   const [summarizerModels, setSummarizerModels] = useState<{ id: string; name: string; context_length?: number }[]>([]);
   const [summarizerLimit, setSummarizerLimit] = useState(10);
+  const [showPromptsPopup, setShowPromptsPopup] = useState(false);
+  const [promptsList, setPromptsList] = useState<{ id: string; name: string; content: string }[]>([]);
+  const [promptsMode, setPromptsMode] = useState<"send" | "assign" | "master">("send");
+  const [masterPromptId, setMasterPromptId] = useState<Set<string>>(new Set());
+  const [assignedPromptId, setAssignedPromptId] = useState<Set<string>>(new Set());
+  const [selectedPromptIds, setSelectedPromptIds] = useState<Set<string>>(new Set());
+  const [promptsSearch, setPromptsSearch] = useState("");
+  const [promptsHighlight, setPromptsHighlight] = useState(0);
 
   const tasks = useLiveTaskStatus();
   const activeConv = conversations.find((c) => c.id === activeConvId) ?? null;
@@ -176,7 +186,23 @@ export const ChatPrimaryView = () => {
     });
     const conv = conversations.find((c) => c.id === activeConvId);
     if (conv?.model) setSelectedModel(conv.model);
+    if (conv?.repo) setSelectedRepo(conv.repo);
+    if (conv?.providerType) setSelectedProviderType(conv.providerType);
   }, [activeConvId]);
+
+  // Persist dropdown selections to the active conversation
+  useEffect(() => {
+    if (!activeConvId || !selectedModel) return;
+    setConversations(prev => prev.map(c => c.id === activeConvId ? { ...c, model: selectedModel } : c));
+  }, [selectedModel, activeConvId]);
+  useEffect(() => {
+    if (!activeConvId) return;
+    setConversations(prev => prev.map(c => c.id === activeConvId ? { ...c, repo: selectedRepo } : c));
+  }, [selectedRepo, activeConvId]);
+  useEffect(() => {
+    if (!activeConvId || !selectedProviderType) return;
+    setConversations(prev => prev.map(c => c.id === activeConvId ? { ...c, providerType: selectedProviderType } : c));
+  }, [selectedProviderType, activeConvId]);
 
   useEffect(() => {
     fetch("/api/providers").then((r) => r.json()).then((d) => {
@@ -260,6 +286,8 @@ export const ChatPrimaryView = () => {
         provider_type: selectedProviderType, model: selectedModel, messages: history,
         image_base64: imagePreview ?? undefined,
         repo: selectedRepo ? `iceyxsm/${selectedRepo}` : undefined, mode,
+        conversation_id: activeConvId ?? undefined,
+        system: masterPromptId.size > 0 ? promptsList.filter(p => masterPromptId.has(p.name)).map(p => p.content ?? "").join("\n\n") : undefined,
       }),
     })
       .then((r) => {
@@ -309,7 +337,7 @@ export const ChatPrimaryView = () => {
         setConversations((prev) => prev.map((c) => c.id === sendingConvId ? { ...c, messages: [...c.messages, errMsg] } : c));
       })
       .finally(() => { setIsTyping(false); setImagePreview(null); });
-  }, [input, activeConvId, selectedModel, selectedProviderType, conversations, imagePreview, mode, exec]);
+  }, [input, activeConvId, selectedModel, selectedProviderType, conversations, imagePreview, mode, exec, masterPromptId, promptsList]);
 
   const handleStart = useCallback(() => {
     if (!selectedRepo || !selectedProviderType || !selectedModel || !activeConvId) return;
@@ -494,7 +522,7 @@ export const ChatPrimaryView = () => {
           <SearchableDropdown items={modelItems} selected={selectedModel} onSelect={setSelectedModel} placeholder="Select model" searchPlaceholder="Search models..." disabled={modelsLoading} />
           <div className="chat-header-spacer" />
           <span className="chat-header-label">Repo:</span>
-          <SearchableDropdown items={repoItems} selected={selectedRepo} onSelect={setSelectedRepo} placeholder="Select repo" searchPlaceholder="Search repos..." />
+          <SearchableDropdown items={repoItems} selected={selectedRepo} onSelect={setSelectedRepo} placeholder="Select repo" searchPlaceholder="Search repos..." disabled={!!activeConv && activeConv.messages.length > 0} />
           <div className="chat-header-spacer" />
           <div className="chat-mode-selector">
             {(["ask", "plan", "build"] as const).map((m) => (
@@ -606,6 +634,14 @@ export const ChatPrimaryView = () => {
                 </div>
               )}
               <input className="chat-input" type="text" placeholder={chatEnabled ? "Type a message..." : "Click Start to begin"} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleSend(); }} disabled={!chatEnabled} />
+              <button type="button" className="chat-prompts-btn" onClick={() => { setShowPromptsPopup(true); fetch("/api/prompts").then(r => r.json()).then(d => setPromptsList(Array.isArray(d?.prompts) ? d.prompts : [])).catch(() => {}); }} title="Prompts / Skills">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                  <line x1="16" y1="13" x2="8" y2="13" />
+                  <line x1="16" y1="17" x2="8" y2="17" />
+                </svg>
+              </button>
               <button type="button" className="chat-send-btn" onClick={handleSend} disabled={!input.trim() || isTyping || !chatEnabled}>Send</button>
             </div>
             {showSummarizerSettings && (
@@ -682,6 +718,87 @@ export const ChatPrimaryView = () => {
                       setShowSummarizerSettings(false);
                     }}>Save</button>
                   </div>
+                </div>
+              </div>
+            )}
+            {showPromptsPopup && (
+              <div className="chat-prompts-popup">
+                <div className="chat-prompts-popup-inner">
+                  <div className="chat-prompts-header">
+                    <h4>Prompts / Skills</h4>
+                    <button type="button" className="chat-prompts-close" onClick={() => { setShowPromptsPopup(false); setSelectedPromptIds(new Set()); setPromptsSearch(""); }}>x</button>
+                  </div>
+                  <div className="chat-prompts-modes">
+                    <button type="button" className={`chat-prompts-mode-btn${promptsMode === "send" ? " is-active" : ""}`} onClick={() => { setPromptsMode("send"); setSelectedPromptIds(new Set()); }}>Send in Chat</button>
+                    <button type="button" className={`chat-prompts-mode-btn${promptsMode === "assign" ? " is-active" : ""}`} onClick={() => { setPromptsMode("assign"); setSelectedPromptIds(new Set()); }}>Assign to Task</button>
+                    <button type="button" className={`chat-prompts-mode-btn${promptsMode === "master" ? " is-active" : ""}`} onClick={() => { setPromptsMode("master"); setSelectedPromptIds(new Set()); }}>Master Prompt</button>
+                  </div>
+                  {promptsMode === "master" && masterPromptId.size > 0 && (
+                    <div className="chat-prompts-master-active">
+                      Active: <strong>{[...masterPromptId].join(", ")}</strong>
+                      <button type="button" onClick={() => { setMasterPromptId(new Set()); }}>Clear</button>
+                    </div>
+                  )}
+                  {promptsMode === "assign" && assignedPromptId.size > 0 && (
+                    <div className="chat-prompts-master-active">
+                      Assigned: <strong>{[...assignedPromptId].join(", ")}</strong>
+                      <button type="button" onClick={() => { setAssignedPromptId(new Set()); }}>Clear</button>
+                    </div>
+                  )}
+                  <input className="chat-prompts-search" type="text" placeholder="Search prompts..." value={promptsSearch} onChange={(e) => { setPromptsSearch(e.target.value); setPromptsHighlight(0); }} autoFocus onKeyDown={(e) => {
+                    const filtered = promptsList.filter(p => !promptsSearch || p.name.toLowerCase().includes(promptsSearch.toLowerCase()));
+                    if (e.key === "ArrowDown") { e.preventDefault(); setPromptsHighlight(h => Math.min(h + 1, filtered.length - 1)); }
+                    else if (e.key === "ArrowUp") { e.preventDefault(); setPromptsHighlight(h => Math.max(h - 1, 0)); }
+                    else if (e.key === "ArrowLeft") { e.preventDefault(); setPromptsMode(m => m === "assign" ? "send" : m === "master" ? "assign" : m); }
+                    else if (e.key === "ArrowRight") { e.preventDefault(); setPromptsMode(m => m === "send" ? "assign" : m === "assign" ? "master" : m); }
+                    else if (e.key === "Enter" && filtered.length > 0) {
+                      e.preventDefault();
+                      const p = filtered[promptsHighlight];
+                      if (!p) return;
+                      if (promptsMode === "send") {
+                        setSelectedPromptIds(prev => { const n = new Set(prev); if (n.has(p.name)) n.delete(p.name); else n.add(p.name); return n; });
+                      } else if (promptsMode === "assign") {
+                        setAssignedPromptId(prev => { const n = new Set(prev); if (n.has(p.name)) n.delete(p.name); else n.add(p.name); return n; });
+                      } else if (promptsMode === "master") {
+                        setMasterPromptId(prev => { const n = new Set(prev); if (n.has(p.name)) n.delete(p.name); else n.add(p.name); return n; });
+                      }
+                    }
+                    else if (e.key === "End" && selectedPromptIds.size > 0) {
+                      e.preventDefault();
+                      const combined = promptsList.filter(p => selectedPromptIds.has(p.name)).map(p => p.content ?? "").join("\n\n");
+                      setInput(prev => prev ? prev + "\n" + combined : combined);
+                      setSelectedPromptIds(new Set()); setShowPromptsPopup(false); setPromptsSearch("");
+                    }
+                    else if (e.key === "Escape") { setShowPromptsPopup(false); setSelectedPromptIds(new Set()); setPromptsSearch(""); }
+                  }} />
+                  <div className="chat-prompts-list">
+                    {promptsList.filter(p => !promptsSearch || p.name.toLowerCase().includes(promptsSearch.toLowerCase())).map((p, i) => {
+                      const isSelected = promptsMode === "send" ? selectedPromptIds.has(p.name) : promptsMode === "master" ? masterPromptId.has(p.name) : assignedPromptId.has(p.name);
+                      return (
+                      <div key={p.id ?? `prompt-${i}`} ref={i === promptsHighlight ? (el) => el?.scrollIntoView({ block: "nearest" }) : undefined} className={`chat-prompts-item${isSelected ? " is-selected" : ""}${i === promptsHighlight ? " is-highlighted" : ""}`} onClick={() => {
+                        if (promptsMode === "send") {
+                          setSelectedPromptIds(prev => { const n = new Set(prev); if (n.has(p.name)) n.delete(p.name); else n.add(p.name); return n; });
+                        } else if (promptsMode === "assign") {
+                          setAssignedPromptId(prev => { const n = new Set(prev); if (n.has(p.name)) n.delete(p.name); else n.add(p.name); return n; });
+                        } else if (promptsMode === "master") {
+                          setMasterPromptId(prev => { const n = new Set(prev); if (n.has(p.name)) n.delete(p.name); else n.add(p.name); return n; });
+                        }
+                      }}>
+                        <span className="chat-prompts-item-name"><span className="chat-prompts-check">{isSelected ? "\u2713" : "\u25CB"}</span>{p.name}</span>
+                        <span className="chat-prompts-item-preview">{(p.content ?? "").slice(0, 60)}{(p.content ?? "").length > 60 ? "..." : ""}</span>
+                      </div>
+                      );
+                    })}
+                    {promptsList.length === 0 && <div className="chat-prompts-empty">No prompts available. Create them on the Prompts page.</div>}
+                  </div>
+                  {promptsMode === "send" && selectedPromptIds.size > 0 && (
+                    <button type="button" className="chat-prompts-send-btn" onClick={() => {
+                      const combined = promptsList.filter(p => selectedPromptIds.has(p.name)).map(p => p.content ?? "").join("\n\n");
+                      setInput(prev => prev ? prev + "\n" + combined : combined);
+                      setSelectedPromptIds(new Set());
+                      setShowPromptsPopup(false);
+                    }}>Send Selected ({selectedPromptIds.size})</button>
+                  )}
                 </div>
               </div>
             )}

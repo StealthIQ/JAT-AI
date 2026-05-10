@@ -29,6 +29,7 @@ class ChatRequest(BaseModel):
     image_base64: str | None = None
     repo: str | None = None
     mode: str = "ask"
+    conversation_id: str | None = None
 
 
 from prompts.system_prompts import ASK_MODE_SYSTEM, PLAN_MODE_SYSTEM, BUILD_MODE_SYSTEM, AUTO_MODE_SYSTEM
@@ -204,6 +205,9 @@ async def _inject_available_skills(system: str) -> str:
 
 
 _SAVE_CONTEXT_PATTERN = re.compile(r"\[ACTION:SAVE_CONTEXT:(.*?)\]", re.DOTALL)
+_PLAN_SAVE_PATTERN = re.compile(r"\[ACTION:PLAN_SAVE:(.*?)\|(.*\})\]", re.DOTALL)
+_PLAN_UPDATE_PATTERN = re.compile(r"\[ACTION:PLAN_UPDATE:(.*?)\|(.*\})\]", re.DOTALL)
+_PLAN_DELETE_PATTERN = re.compile(r"\[ACTION:PLAN_DELETE:(.*?)\]", re.DOTALL)
 
 
 async def _handle_save_context(repo: str | None, response: str) -> None:
@@ -217,6 +221,37 @@ async def _handle_save_context(repo: str | None, response: str) -> None:
         return
     for content in matches:
         await store_context(parts[0], parts[1], content.strip(), metadata={"type": "ai_saved"})
+
+
+async def _handle_plan_actions(conversation_id: str | None, response: str) -> None:
+    if not conversation_id:
+        return
+    # PLAN_SAVE
+    for title, plan_json in _PLAN_SAVE_PATTERN.findall(response):
+        try:
+            existing = await db.select("plans", filters={"conversation_id": conversation_id})
+            if existing:
+                await db.update("plans", {"title": title.strip(), "plan_json": plan_json.strip(), "status": "draft"}, filters={"id": existing[0]["id"]})
+            else:
+                await db.insert("plans", {"conversation_id": conversation_id, "title": title.strip(), "plan_json": plan_json.strip(), "status": "draft"})
+        except Exception:
+            pass
+    # PLAN_UPDATE
+    for title, plan_json in _PLAN_UPDATE_PATTERN.findall(response):
+        try:
+            existing = await db.select("plans", filters={"conversation_id": conversation_id})
+            if existing:
+                await db.update("plans", {"title": title.strip(), "plan_json": plan_json.strip()}, filters={"id": existing[0]["id"]})
+            else:
+                await db.insert("plans", {"conversation_id": conversation_id, "title": title.strip(), "plan_json": plan_json.strip(), "status": "draft"})
+        except Exception:
+            pass
+    # PLAN_DELETE
+    for title in _PLAN_DELETE_PATTERN.findall(response):
+        try:
+            await db.delete("plans", filters={"conversation_id": conversation_id})
+        except Exception:
+            pass
 
 
 @router.post("/api/chat/send")
@@ -261,6 +296,16 @@ async def chat_send(request: ChatRequest):
     if request.mode in ("plan", "auto") and not request.system:
         system = await _inject_available_skills(system)
 
+    # Inject stored plan if one exists for this conversation
+    if request.conversation_id:
+        try:
+            plan_rows = await db.select("plans", filters={"conversation_id": request.conversation_id})
+            if plan_rows:
+                p = plan_rows[0]
+                system += f"\n\n<current_plan title=\"{p['title']}\" status=\"{p['status']}\">\n{p['plan_json']}\n</current_plan>"
+        except Exception:
+            pass
+
     injected_chunks: list[str] = []
     if request.repo and request.messages:
         parts = request.repo.split("/", 1)
@@ -301,6 +346,7 @@ async def chat_send(request: ChatRequest):
                 custom_base_url=key_row.get("base_url", ""),
             )
             await _handle_save_context(request.repo, response)
+            await _handle_plan_actions(request.conversation_id, response)
 
             if injected_chunks and request.repo:
                 try:

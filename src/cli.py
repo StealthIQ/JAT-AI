@@ -4,6 +4,10 @@ import argparse
 import asyncio
 import json
 import sys
+from pathlib import Path
+
+# Ensure src/ is on path for bare imports used throughout the codebase
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import structlog
 

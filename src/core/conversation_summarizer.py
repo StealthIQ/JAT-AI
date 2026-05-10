@@ -54,13 +54,24 @@ def build_summarized_history(messages: list[dict], keep_recent: int = 4) -> list
 
     older = messages[:-keep_recent]
     recent = messages[-keep_recent:]
-    summary = extract_summary(older)
+
+    # Preserve messages containing plan actions — they must not be compressed
+    preserved = []
+    compressible = []
+    for msg in older:
+        content = msg.get("content", "")
+        if "[ACTION:PLAN_SAVE:" in content or "[ACTION:PLAN_UPDATE:" in content:
+            preserved.append(msg)
+        else:
+            compressible.append(msg)
+
+    summary = extract_summary(compressible)
 
     summary_msg = {
         "role": "system",
         "content": f"[Conversation summary]\n{summary}",
     }
-    return [summary_msg] + recent
+    return [summary_msg] + preserved + recent
 
 
 async def build_ai_summarized_history(
@@ -75,9 +86,19 @@ async def build_ai_summarized_history(
     older = messages[:-keep_recent]
     recent = messages[-keep_recent:]
 
+    # Preserve plan action messages
+    preserved = []
+    compressible = []
+    for msg in older:
+        content = msg.get("content", "")
+        if "[ACTION:PLAN_SAVE:" in content or "[ACTION:PLAN_UPDATE:" in content:
+            preserved.append(msg)
+        else:
+            compressible.append(msg)
+
     conversation_text = "\n".join(
         f"{m.get('role', 'unknown').upper()}: {m.get('content', '')[:500]}"
-        for m in older
+        for m in compressible
     )
 
     try:
@@ -97,7 +118,7 @@ async def build_ai_summarized_history(
         "role": "system",
         "content": f"[AI-generated conversation summary]\n{summary_text}",
     }
-    return [summary_msg] + recent
+    return [summary_msg] + preserved + recent
 
 
 async def get_summarizer_config() -> dict:

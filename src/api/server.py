@@ -16,6 +16,7 @@ from api.execute import router as execute_router
 from api.conversations import router as conversations_router
 from api.settings import router as settings_router
 from api.usage import router as usage_router
+from api.plans import router as plans_router
 from config import load_settings
 from db import db
 
@@ -49,6 +50,7 @@ app.include_router(execute_router)
 app.include_router(conversations_router)
 app.include_router(settings_router)
 app.include_router(usage_router)
+app.include_router(plans_router)
 
 
 class PromptCreate(BaseModel):
@@ -64,7 +66,7 @@ class PromptUpdate(BaseModel):
 @app.get("/api/prompts")
 async def list_prompts():
     rows = await db.select("prompts")
-    return {"prompts": [{"name": r["name"], "source": r.get("source", "user")} for r in rows]}
+    return {"prompts": [{"id": r.get("id") or r["name"], "name": r["name"], "content": r.get("content", ""), "source": r.get("source", "user")} for r in rows]}
 
 
 @app.get("/api/prompts/system")

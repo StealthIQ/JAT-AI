@@ -57,6 +57,7 @@ class ExecuteResponse(BaseModel):
 
 async def _update_jdocs(plan: ExecutionPlan, task: AgentTask, status: str, session_id: str, pr_url: str | None, token: str):
     from core.jdocs import update_context_after_agent, append_session_history
+    # Write to agent's own branch
     await update_context_after_agent(
         plan.repo_owner, plan.repo_name, task.branch_name, token,
         agent_id=task.id, task_description=task.description,
@@ -67,6 +68,20 @@ async def _update_jdocs(plan: ExecutionPlan, task: AgentTask, status: str, sessi
         agent_id=task.id, session_id=session_id or "",
         status=status, prompt_summary=task.description[:200],
     )
+    # Also write to main so subsequent agents can read prior context
+    try:
+        await update_context_after_agent(
+            plan.repo_owner, plan.repo_name, "main", token,
+            agent_id=task.id, task_description=task.description,
+            status=status, pr_url=pr_url, files_changed=None,
+        )
+        await append_session_history(
+            plan.repo_owner, plan.repo_name, "main", token,
+            agent_id=task.id, session_id=session_id or "",
+            status=status, prompt_summary=task.description[:200],
+        )
+    except Exception:
+        pass  # Non-critical — agent branch has the data regardless
 
 
 def _extract_pr_url(outputs: list[dict]) -> str | None:
@@ -76,7 +91,7 @@ def _extract_pr_url(outputs: list[dict]) -> str | None:
     return None
 
 
-async def _run_task_once(task: AgentTask, plan: ExecutionPlan, base_sha: str, jules_key: str, token: str) -> TaskResult:
+async def _run_task_once(task: AgentTask, plan: ExecutionPlan, base_sha: str, jules_key: str, token: str, task_index: int = 0) -> TaskResult:
     limiter = get_session_limiter()
     pipeline_id = f"{plan.repo_owner}/{plan.repo_name}"
 
@@ -92,7 +107,7 @@ async def _run_task_once(task: AgentTask, plan: ExecutionPlan, base_sha: str, ju
         if not branch_created:
             return TaskResult(task_id=task.id, status="failed", error="Branch creation failed")
 
-        prompt = await _resolve_prompt(task)
+        prompt = await _resolve_prompt(task, plan, token, task_index)
         session_id = await create_jules_session(
             prompt=prompt, owner=plan.repo_owner, repo=plan.repo_name,
             branch=task.branch_name, jules_key=jules_key,
@@ -119,24 +134,63 @@ async def _run_task_once(task: AgentTask, plan: ExecutionPlan, base_sha: str, ju
         await limiter.release(task.id)
 
 
-async def _resolve_prompt(task: AgentTask) -> str:
-    prompt = task.description
+async def _resolve_prompt(task: AgentTask, plan: ExecutionPlan, token: str, task_index: int = 0) -> str:
+    from core.prompt_builder import build_agent_xml_prompt
+
+    # Read prior agent context from jdocs on the default branch
+    dependency_context = await _read_jdocs_context(plan.repo_owner, plan.repo_name, token)
+
+    # If task has a prompt_id, load the skill content as extra steps
+    steps = ""
     if task.prompt_id:
         try:
             rows = await db.select("prompts", filters={"name": task.prompt_id})
             if rows:
-                prompt = rows[0].get("content", "") + "\n\n" + prompt
+                steps = rows[0].get("content", "")
         except Exception:
             pass
-    if task.exit_criteria:
-        prompt += f"\n\nExit criteria: {task.exit_criteria}"
-    return prompt
+
+    # Parse acceptance criteria from exit_criteria (split on newlines or semicolons)
+    criteria = [c.strip() for c in task.exit_criteria.replace(";", "\n").split("\n") if c.strip()] if task.exit_criteria else ["Task completed as described"]
+
+    return build_agent_xml_prompt(
+        agent_index=task_index + 1,
+        total_agents=len(plan.tasks),
+        title=task.description[:80],
+        description=task.description,
+        branch_name=task.branch_name,
+        files_scope=[],  # Jules discovers files from the repo
+        acceptance_criteria=criteria,
+        repo_owner=plan.repo_owner,
+        repo_name=plan.repo_name,
+        dependency_context=dependency_context,
+        steps=steps,
+    )
 
 
-async def _run_task(task: AgentTask, plan: ExecutionPlan, base_sha: str, jules_key: str, token: str) -> TaskResult:
+async def _read_jdocs_context(owner: str, repo: str, token: str, branch: str = "main") -> str:
+    """Fetch .jules/jdocs/context.xml from the repo so the next agent knows what prior agents did."""
+    import httpx
+    import base64
+
+    url = f"https://api.github.com/repos/{owner}/{repo}/contents/.jules/jdocs/context.xml?ref={branch}"
+    headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            res = await client.get(url, headers=headers)
+        if res.status_code == 200:
+            content = base64.b64decode(res.json()["content"]).decode()
+            return content
+    except Exception:
+        pass
+    return "No prior agent context available."
+
+
+async def _run_task(task: AgentTask, plan: ExecutionPlan, base_sha: str, jules_key: str, token: str, task_index: int = 0) -> TaskResult:
     max_retries = plan.max_retries if hasattr(plan, "max_retries") else 2
     for attempt in range(max_retries + 1):
-        result = await _run_task_once(task, plan, base_sha, jules_key, token)
+        result = await _run_task_once(task, plan, base_sha, jules_key, token, task_index)
         if result.status == "completed":
             return result
         if attempt < max_retries:
@@ -150,8 +204,8 @@ async def _execute_sequential(plan: ExecutionPlan, jules_key: str, token: str) -
         return [TaskResult(task_id=t.id, status="failed", error="Could not get base SHA") for t in plan.tasks]
 
     results = []
-    for task in plan.tasks:
-        result = await _run_task(task, plan, base_sha, jules_key, token)
+    for i, task in enumerate(plan.tasks):
+        result = await _run_task(task, plan, base_sha, jules_key, token, i)
         results.append(result)
         if result.status == "failed":
             break
@@ -163,7 +217,7 @@ async def _execute_parallel(plan: ExecutionPlan, jules_key: str, token: str) -> 
     if not base_sha:
         return [TaskResult(task_id=t.id, status="failed", error="Could not get base SHA") for t in plan.tasks]
 
-    coros = [_run_task(task, plan, base_sha, jules_key, token) for task in plan.tasks]
+    coros = [_run_task(task, plan, base_sha, jules_key, token, i) for i, task in enumerate(plan.tasks)]
     return await asyncio.gather(*coros)
 
 
@@ -181,7 +235,7 @@ async def _execute_hybrid(plan: ExecutionPlan, jules_key: str, token: str) -> li
         if not ready:
             break
 
-        coros = [_run_task(t, plan, base_sha, jules_key, token) for t in ready]
+        coros = [_run_task(t, plan, base_sha, jules_key, token, plan.tasks.index(t)) for t in ready]
         batch_results = await asyncio.gather(*coros)
 
         for task, result in zip(ready, batch_results):
