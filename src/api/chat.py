@@ -138,13 +138,13 @@ async def _call_openai_compat(api_key: str, provider_type: str, model: str, mess
         res = await client.post(f"{base_url}/chat/completions", json=payload, headers=headers)
 
     if res.status_code == 429:
-        # Single retry after short delay before giving up on this key
         import asyncio
+        print(f"[RATE_LIMIT] {provider_type} returned 429: {res.text[:200]}")
         await asyncio.sleep(3)
         async with httpx.AsyncClient(timeout=60.0) as client:
             res = await client.post(f"{base_url}/chat/completions", json=payload, headers=headers)
         if res.status_code == 429:
-            raise RateLimitError(provider_type)
+            raise RateLimitError(f"{provider_type}: {res.text[:100]}")
     if res.status_code == 404:
         raise ModelNotAvailableError(f"Model '{model}' is not available on {provider_type}. Try a different model.")
     if res.status_code != 200:
