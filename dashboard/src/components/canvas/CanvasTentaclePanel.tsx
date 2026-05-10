@@ -284,34 +284,6 @@ export const CanvasTentaclePanel = ({
           </div>
         </div>
 
-        {/* Actions section */}
-        <div className="detail-section">
-          <div className="detail-section-title">Actions</div>
-          <div className="detail-actions">
-            <button
-              type="button"
-              className="detail-action-btn"
-              onClick={() => onCreateAgent?.(node.tentacleId)}
-            >
-              &gt;_ Create Agent
-            </button>
-            <button
-              type="button"
-              className="detail-action-btn"
-              onClick={() => onSpawnSwarm?.(node.tentacleId, "worktree")}
-            >
-              &#x2263; Spawn Swarm (Worktrees)
-            </button>
-            <button
-              type="button"
-              className="detail-action-btn"
-              onClick={() => onSpawnSwarm?.(node.tentacleId, "shared")}
-            >
-              &#x2263; Spawn Swarm (Normal)
-            </button>
-          </div>
-        </div>
-
         {/* Progress section */}
         {tentacle && (
           <div className="detail-section">

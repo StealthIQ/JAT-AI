@@ -125,10 +125,11 @@ const GLYPH_W = 112;
 const GLYPH_H = 120;
 
 const isEdgeActivityVisible = (target: GraphNode): boolean =>
-  target.type === "active-session" &&
-  target.hasUserPrompt !== false &&
-  target.agentRuntimeState !== undefined &&
-  target.agentRuntimeState !== "idle";
+  (target.type === "active-session" &&
+    target.hasUserPrompt !== false &&
+    target.agentRuntimeState !== undefined &&
+    target.agentRuntimeState !== "idle") ||
+  (target.type === "inactive-session" && !target.firstPromptPreview?.startsWith("[done]"));
 
 const renderEdgeActivityDots = (path: string, color: string, keyPrefix: string) =>
   [0, 1, 2].flatMap((index) => [

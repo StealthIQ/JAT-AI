@@ -186,6 +186,18 @@ async def list_terminals():
     } for r in rows]
 
 
+@app.delete("/api/agent-tasks/{task_id}")
+async def delete_agent_task(task_id: str):
+    await db.delete("agent_tasks", {"id": task_id})
+    return {"ok": True}
+
+
+@app.delete("/api/agent-tasks")
+async def delete_all_agent_tasks():
+    await db.delete("agent_tasks")
+    return {"ok": True}
+
+
 @app.get("/api/terminal-snapshots")
 async def list_terminal_snapshots():
     return await list_terminals()
@@ -199,6 +211,7 @@ async def list_tentacles():
         rows = await db.select("agent_tasks")
     except Exception:
         rows = []
+
     repos: dict[str, dict] = {}
     for r in rows:
         key = f"{r['repo_owner']}/{r['repo_name']}"
@@ -215,41 +228,72 @@ async def list_tentacles():
                 "vaultFiles": [],
                 "todoTotal": 0,
                 "todoDone": 0,
-                "todos": [],
+                "todoItems": [],
                 "suggestedSkills": [],
+                "_has_running": False,
+                "_has_pending": False,
             }
         repo = repos[key]
         repo["todoTotal"] += 1
-        if r["status"] in ("completed", "failed"):
+        status = r.get("status", "pending")
+        if status == "completed":
             repo["todoDone"] += 1
-        if r["status"] == "running":
-            repo["status"] = "active"
-        repo["todos"].append({
+        elif status == "running":
+            repo["_has_running"] = True
+        elif status in ("pending", "blocked"):
+            repo["_has_pending"] = True
+        repo["todoItems"].append({
             "text": r.get("prompt", "")[:80],
-            "done": r["status"] == "completed",
+            "done": status == "completed",
         })
+
+    for repo in repos.values():
+        if repo["todoDone"] == repo["todoTotal"] and repo["todoTotal"] > 0:
+            repo["status"] = "idle"
+            repo["octopus"]["animation"] = "sleeping"
+            repo["octopus"]["expression"] = "sleeping"
+        elif repo["_has_running"]:
+            repo["status"] = "active"
+            repo["octopus"]["animation"] = "working"
+        elif repo["_has_pending"]:
+            repo["status"] = "idle"
+            repo["octopus"]["animation"] = "idle"
+        del repo["_has_running"]
+        del repo["_has_pending"]
+
     if not repos:
-        repos = await _fetch_jules_repos_as_tentacles()
+        fallback = await _fetch_jules_repos_as_tentacles()
+        return list(fallback.values())
     return list(repos.values())
 
 
-@app.get("/api/conversations")
-async def list_conversations():
-    rows = await db.select("conversations")
-    return {"sessions": [{
-        "sessionId": r["id"],
-        "tentacleId": f"{r['repo_owner']}/{r['repo_name']}" if r.get("repo_owner") else "",
-        "startedAt": r["created_at"],
-        "endedAt": r.get("updated_at"),
-        "lastEventAt": r.get("updated_at"),
-        "eventCount": 0,
-        "turnCount": 0,
-        "userTurnCount": 0,
-        "assistantTurnCount": 0,
-        "firstUserTurnPreview": r.get("title", ""),
-        "lastUserTurnPreview": r.get("title", ""),
-        "lastAssistantTurnPreview": "",
-    } for r in rows]}
+@app.get("/api/canvas/sessions")
+async def list_canvas_sessions():
+    try:
+        tasks = await db.select("agent_tasks")
+    except Exception:
+        tasks = []
+
+    sessions = []
+    for t in tasks:
+        is_done = t["status"] == "completed"
+        preview = t.get("prompt", "")[:60]
+        sessions.append({
+            "sessionId": t.get("session_id") or t["id"],
+            "tentacleId": f"{t['repo_owner']}/{t['repo_name']}",
+            "startedAt": t.get("created_at", ""),
+            "endedAt": t.get("updated_at", "") if is_done else None,
+            "lastEventAt": t.get("updated_at", ""),
+            "eventCount": 1,
+            "turnCount": 1,
+            "userTurnCount": 1,
+            "assistantTurnCount": 0,
+            "firstUserTurnPreview": f"[done] {preview}" if is_done else preview,
+            "lastUserTurnPreview": preview,
+            "lastAssistantTurnPreview": t["status"],
+        })
+
+    return sessions
 
 
 @app.get("/api/claude/usage")

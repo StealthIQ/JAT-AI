@@ -139,7 +139,6 @@ async def _call_openai_compat(api_key: str, provider_type: str, model: str, mess
 
     if res.status_code == 429:
         import asyncio
-        print(f"[RATE_LIMIT] {provider_type} returned 429: {res.text[:200]}")
         await asyncio.sleep(3)
         async with httpx.AsyncClient(timeout=60.0) as client:
             res = await client.post(f"{base_url}/chat/completions", json=payload, headers=headers)

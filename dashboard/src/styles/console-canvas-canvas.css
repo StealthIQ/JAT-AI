@@ -77,6 +77,25 @@
   animation: canvas-bloom-pulse 3s ease-in-out infinite;
 }
 
+.canvas-node-bloom--receive {
+  animation: canvas-bloom-receive 1.9s ease-in-out infinite;
+}
+
+@keyframes canvas-bloom-receive {
+  0%, 70% {
+    opacity: 0.15;
+    transform: scale(1);
+  }
+  85% {
+    opacity: 0.6;
+    transform: scale(1.3);
+  }
+  100% {
+    opacity: 0.15;
+    transform: scale(1);
+  }
+}
+
 @keyframes canvas-bloom-pulse {
   0%,
   100% {
@@ -1850,4 +1869,109 @@
   --action-button-padding-y: 0.22rem;
   --action-button-padding-x: 0.4rem;
   --action-button-letter-spacing: 0.07em;
+}
+
+
+/* ── Delete tasks dialog ── */
+
+.canvas-delete-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.canvas-delete-dialog {
+  background: #0d1117;
+  border: 1px solid #2a3040;
+  border-radius: 8px;
+  padding: 1.5rem;
+  width: 400px;
+  max-height: 70vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.canvas-delete-dialog h3 {
+  margin: 0;
+  color: #e6e8ec;
+  font-size: 1rem;
+}
+
+.canvas-delete-task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.canvas-delete-task-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: #b0b8c4;
+  cursor: pointer;
+}
+
+.canvas-delete-task-item input[type="checkbox"] {
+  accent-color: #00e5ff;
+}
+
+.canvas-delete-task-status {
+  margin-left: auto;
+  font-size: 0.7rem;
+  color: #5a6a7e;
+}
+
+.canvas-delete-divider {
+  text-align: center;
+  color: #5a6a7e;
+  font-size: 0.75rem;
+}
+
+.canvas-delete-dialog input[type="text"] {
+  background: #151b24;
+  border: 1px solid #2a3040;
+  border-radius: 4px;
+  padding: 0.5rem;
+  color: #e6e8ec;
+  font-size: 0.85rem;
+}
+
+.canvas-delete-btn {
+  padding: 0.5rem 1rem;
+  border: 1px solid #2a3040;
+  border-radius: 4px;
+  background: #151b24;
+  color: #e6e8ec;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.canvas-delete-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.canvas-delete-btn--danger {
+  background: #2a1015;
+  border-color: #6b3030;
+  color: #ef4444;
+}
+
+.canvas-delete-btn--danger:not(:disabled):hover {
+  background: #3a1520;
+}
+
+.canvas-delete-btn--cancel {
+  background: transparent;
+  border-color: #2a3040;
+  color: #5a6a7e;
 }

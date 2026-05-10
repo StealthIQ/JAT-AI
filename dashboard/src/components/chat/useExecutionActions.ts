@@ -44,11 +44,10 @@ export function useExecutionActions(
   const [executionStatus, setExecutionStatus] = useState<string | null>(null);
 
   const handleApprove = useCallback(() => {
-    if (!activeConv || !selectedRepo) return;
+    if (!activeConv || !selectedRepo || isExecuting) return;
     const lastAssistant = [...activeConv.messages].reverse().find((m) => m.role === "assistant");
     if (!lastAssistant) return;
 
-    // Extract JSON plan from the message (may be wrapped in ```json ... ```)
     const jsonMatch = lastAssistant.content.match(/```json\s*([\s\S]*?)```/);
     const planJson = jsonMatch ? jsonMatch[1].trim() : lastAssistant.content;
 
@@ -63,10 +62,19 @@ export function useExecutionActions(
         plan_json: planJson,
         repo_owner: "iceyxsm",
         repo_name: selectedRepo,
+        provider_type: selectedProviderType,
+        model: selectedModel,
       }),
     })
-      .then((r) => {
-        if (!r.ok) return r.json().then((d: any) => { throw new Error(d.detail ?? `Execute failed (${r.status})`); });
+      .then(async (r) => {
+        if (!r.ok) {
+          let detail = `Execute failed (${r.status})`;
+          try {
+            const d = await r.json();
+            if (d.detail) detail = d.detail;
+          } catch {}
+          throw new Error(detail);
+        }
         return r.json();
       })
       .then((data) => {
@@ -86,7 +94,7 @@ export function useExecutionActions(
       })
       .catch((e) => setExecutionStatus(`Failed: ${e.message}`))
       .finally(() => setIsExecuting(false));
-  }, [activeConv, selectedRepo, activeConvId, setConversations]);
+  }, [activeConv, selectedRepo, activeConvId, setConversations, isExecuting, selectedProviderType, selectedModel]);
 
   const handleAutoMode = useCallback(() => {
     if (!selectedRepo || !selectedProviderType || !selectedModel) return;

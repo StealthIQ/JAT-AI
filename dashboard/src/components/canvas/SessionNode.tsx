@@ -45,13 +45,14 @@ type SessionNodeProps = {
 
 export const SessionNode = ({ node, isSelected, onPointerDown, onClick }: SessionNodeProps) => {
   const isActive = node.type === "active-session" && node.hasUserPrompt !== false;
-  const isLive = isActive && node.agentState === "live";
+  const isRunningTask = node.type === "inactive-session" && !node.firstPromptPreview?.startsWith("[done]");
+  const isLive = (isActive && node.agentState === "live") || isRunningTask;
   const isWaiting =
     node.agentRuntimeState === "waiting_for_permission" ||
     node.agentRuntimeState === "waiting_for_user";
   const isLifecycleAttention =
     node.agentState === "stale" || node.agentState === "exited" || node.agentState === "stopped";
-  const color = isActive ? node.color : "#9ca3af";
+  const color = (isActive || isRunningTask) ? node.color : "#9ca3af";
   const isWorktree = node.workspaceMode === "worktree" && !node.parentTerminalId;
   const isSwarmWorker = !!node.parentTerminalId;
   const lines = useMemo(() => splitLabel(node.label), [node.label]);
@@ -138,10 +139,10 @@ export const SessionNode = ({ node, isSelected, onPointerDown, onClick }: Sessio
       )}
 
       <circle
-        className={`canvas-node-bloom${isLive || isWaiting || isLifecycleAttention ? " canvas-node-bloom--pulse" : ""}`}
+        className={`canvas-node-bloom${isLive || isWaiting || isLifecycleAttention ? (isRunningTask ? " canvas-node-bloom--receive" : " canvas-node-bloom--pulse") : ""}`}
         r={node.radius + 3}
         fill={isWaiting || isLifecycleAttention ? "#f59e0b" : color}
-        opacity={isWaiting || isLifecycleAttention ? 0.3 : isActive ? 0.15 : 0.08}
+        opacity={isWaiting || isLifecycleAttention ? 0.3 : (isActive || isRunningTask) ? 0.15 : 0.08}
       />
 
       {/* Bright core dot — accent when waiting */}
@@ -149,7 +150,7 @@ export const SessionNode = ({ node, isSelected, onPointerDown, onClick }: Sessio
         className="canvas-node-core"
         r={node.radius}
         fill={isWaiting || isLifecycleAttention ? "#f59e0b" : color}
-        opacity={isActive ? 1 : 0.4}
+        opacity={(isActive || isRunningTask) ? 1 : 0.4}
       />
 
       {/* State indicator pill */}
@@ -178,7 +179,7 @@ export const SessionNode = ({ node, isSelected, onPointerDown, onClick }: Sessio
         y={node.radius + 16 + labelYOffset}
         textAnchor="middle"
         className="canvas-node-label canvas-node-label--session canvas-node-label--always"
-        fill="var(--accent-primary)"
+        fill={node.firstPromptPreview?.startsWith("[done]") ? node.color : "var(--accent-primary)"}
       >
         <tspan x="0" dy="0">
           {lines[0]}

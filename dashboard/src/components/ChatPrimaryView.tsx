@@ -90,6 +90,17 @@ class RateLimitError extends Error {
   }
 }
 
+function hasPlanJson(text: string): boolean {
+  const match = text.match(/```json\s*([\s\S]*?)```/);
+  if (!match) return false;
+  try {
+    const parsed = JSON.parse(match[1]);
+    return Array.isArray(parsed.tasks) && parsed.tasks.length > 0;
+  } catch {
+    return false;
+  }
+}
+
 export const ChatPrimaryView = () => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
@@ -175,6 +186,11 @@ export const ChatPrimaryView = () => {
           ? { ...c, messages: msgs.length > 0 ? msgs : c.messages }
           : c));
         setIsStarted(msgs.length > 0);
+        if (msgs.length > 0) {
+          if (msgs.some((m: Message) => m.role === "assistant" && hasPlanJson(m.content))) {
+            exec.setPlanReady(true);
+          }
+        }
       })
       .catch(() => {})
       .finally(() => setMessagesLoading(false));
@@ -231,7 +247,7 @@ export const ChatPrimaryView = () => {
       }
       const types = Object.values(grouped);
       setProviderTypes(types);
-      if (types.length > 0 && !selectedProviderType) setSelectedProviderType(types[0].type);
+      if (types.length > 0) setSelectedProviderType((prev) => prev || types[0].type);
     }).catch(() => {}).finally(() => setProvidersLoaded(true));
   }, []);
 
@@ -242,9 +258,14 @@ export const ChatPrimaryView = () => {
     setModelsLoading(true);
     setModels([]);
     fetch(`/api/providers/${group.ids[0]}/models`).then((r) => r.json()).then((d) => {
-      const modelList = d.models ?? [];
+      const raw = d.models ?? [];
+      const seen = new Set<string>();
+      const modelList = raw.filter((m: { id: string }) => {
+        if (seen.has(m.id)) return false;
+        seen.add(m.id);
+        return true;
+      });
       setModels(modelList);
-      // Only change model if current selection isn't in the new list
       if (modelList.length > 0) {
         setSelectedModel((prev) => {
           if (prev && modelList.some((m: { id: string }) => m.id === prev)) return prev;
@@ -258,7 +279,7 @@ export const ChatPrimaryView = () => {
 
   useEffect(() => {
     fetch("/api/github/repos").then((r) => r.json()).then((d) => {
-      const names = (d.repos ?? []).map((r: { name: string }) => r.name);
+      const names = [...new Set((d.repos ?? []).map((r: { name: string }) => r.name))] as string[];
       setRepos(names);
       if (names.length > 0) setSelectedRepo((prev) => prev && names.includes(prev) ? prev : names[0]);
     }).catch(() => {});
@@ -331,8 +352,16 @@ export const ChatPrimaryView = () => {
           return next;
         });
         setUsage((u) => ({ ...u, tokensUsed: u.tokensUsed + content.length }));
-        if (mode === "plan" && (content.includes('"tasks"') || content.includes('"execution_mode"'))) {
+        if (hasPlanJson(content)) {
           exec.setPlanReady(true);
+        } else if (mode === "plan") {
+          setConversations((prev) => {
+            const conv = prev.find((c) => c.id === sendingConvId);
+            if (conv?.messages.some((m) => m.role === "assistant" && hasPlanJson(m.content))) {
+              exec.setPlanReady(true);
+            }
+            return prev;
+          });
         }
         fetch(`/api/conversations/${sendingConvId}/messages`, {
           method: "POST", headers: { "Content-Type": "application/json" },
@@ -476,7 +505,6 @@ export const ChatPrimaryView = () => {
       if (!plan.tasks) return null;
       const before = text.slice(0, text.indexOf("```json")).trim();
       let after = text.slice(text.indexOf("```", text.indexOf("```json") + 7) + 3).trim();
-      // Strip action tags and any trailing raw JSON from the "after" portion
       after = after.replace(/\[ACTION:\w+(?::[^\]]*)?\]/g, "").replace(/\{[\s\S]*"tasks"[\s\S]*\}$/m, "").trim();
       let html = before ? marked.parse(before) as string : "";
       html += `<div class="chat-plan-tasks">`;

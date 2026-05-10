@@ -186,6 +186,57 @@ const renderEdgeActivityDots = (path: string, color: string, keyPrefix: string) 
     </circle>,
   ]);
 
+const DeleteTasksDialog = ({ onClose }: { onClose: () => void }) => {
+  const [confirmText, setConfirmText] = useState("");
+  const [tasks, setTasks] = useState<{ id: string; prompt: string; status: string; selected: boolean }[]>([]);
+
+  useEffect(() => {
+    fetch("/api/terminals").then((r) => r.json()).then((d) => {
+      const items = (Array.isArray(d) ? d : []).map((t: any) => ({ id: t.terminalId, prompt: t.tentacleName ?? "", status: t.state ?? "", selected: false }));
+      setTasks(items);
+    }).catch(() => {});
+  }, []);
+
+  const handleDeleteSelected = () => {
+    const ids = tasks.filter((t) => t.selected).map((t) => t.id);
+    if (ids.length === 0) return;
+    Promise.all(ids.map((id) => fetch(`/api/agent-tasks/${id}`, { method: "DELETE" }))).then(() => onClose());
+  };
+
+  const handleDeleteAll = () => {
+    if (confirmText !== "delete all") return;
+    fetch("/api/agent-tasks", { method: "DELETE" }).then(() => onClose());
+  };
+
+  return (
+    <div className="canvas-delete-dialog-overlay" onClick={onClose}>
+      <div className="canvas-delete-dialog" onClick={(e) => e.stopPropagation()}>
+        <h3>Delete Tasks</h3>
+        {tasks.length > 0 && (
+          <div className="canvas-delete-task-list">
+            {tasks.map((t) => (
+              <label key={t.id} className="canvas-delete-task-item">
+                <input type="checkbox" checked={t.selected} onChange={() => setTasks((prev) => prev.map((p) => p.id === t.id ? { ...p, selected: !p.selected } : p))} />
+                <span>{t.prompt.slice(0, 60)}</span>
+                <span className="canvas-delete-task-status">{t.status}</span>
+              </label>
+            ))}
+          </div>
+        )}
+        <button type="button" className="canvas-delete-btn" disabled={!tasks.some((t) => t.selected)} onClick={handleDeleteSelected}>
+          Delete Selected
+        </button>
+        <div className="canvas-delete-divider">or</div>
+        <input type="text" value={confirmText} onChange={(e) => setConfirmText(e.target.value)} placeholder="Type 'delete all' to confirm" />
+        <button type="button" className="canvas-delete-btn canvas-delete-btn--danger" disabled={confirmText !== "delete all"} onClick={handleDeleteAll}>
+          Delete All Tasks
+        </button>
+        <button type="button" className="canvas-delete-btn canvas-delete-btn--cancel" onClick={onClose}>Cancel</button>
+      </div>
+    </div>
+  );
+};
+
 export const CanvasPrimaryView = ({
   columns,
   runtimeStateStore: providedRuntimeStateStore,
@@ -894,7 +945,7 @@ export const CanvasPrimaryView = ({
   );
   const sessionNodes = simulatedNodes.filter((n) => {
     if (n.type === "tentacle" || n.type === "octoboss") return false;
-    if (hideIdleTerminals && n.type === "inactive-session") return false;
+    if (hideIdleTerminals && n.type === "inactive-session" && n.firstPromptPreview?.startsWith("[done]")) return false;
     if (
       hideIdleTerminals &&
       n.type === "active-session" &&
@@ -1059,7 +1110,7 @@ export const CanvasPrimaryView = ({
                 .map((e) => nodesById.get(e.target))
                 .filter((n): n is GraphNode => {
                   if (!n) return false;
-                  if (hideIdleTerminals && n.type === "inactive-session") return false;
+                  if (hideIdleTerminals && n.type === "inactive-session" && n.firstPromptPreview?.startsWith("[done]")) return false;
                   if (
                     hideIdleTerminals &&
                     n.type === "active-session" &&
@@ -1488,7 +1539,11 @@ export const CanvasPrimaryView = ({
 
       {pendingDeleteTerminal && onCancelDelete && onConfirmDelete && null}
 
-      {isDeleteAllDialogOpen && null}
+      {isDeleteAllDialogOpen && (
+        <DeleteTasksDialog
+          onClose={() => setIsDeleteAllDialogOpen(false)}
+        />
+      )}
     </section>
   );
 };

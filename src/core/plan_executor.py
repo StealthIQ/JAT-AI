@@ -63,7 +63,15 @@ async def create_branch_from_ref(owner: str, repo: str, branch_name: str, sha: s
     body = {"ref": f"refs/heads/{branch_name}", "sha": sha}
     async with httpx.AsyncClient(timeout=15.0) as client:
         res = await client.post(url, json=body, headers=headers)
-    return res.status_code == 201
+    if res.status_code == 201:
+        return True
+    # Branch already exists — update it to the latest SHA
+    if res.status_code == 422:
+        update_url = f"https://api.github.com/repos/{owner}/{repo}/git/refs/heads/{branch_name}"
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            update_res = await client.patch(update_url, json={"sha": sha, "force": True}, headers=headers)
+        return update_res.status_code == 200
+    return False
 
 
 async def get_default_branch_sha(owner: str, repo: str, token: str) -> str | None:
@@ -85,17 +93,57 @@ async def get_default_branch_sha(owner: str, repo: str, token: str) -> str | Non
 async def create_jules_session(prompt: str, owner: str, repo: str, branch: str, jules_key: str) -> str | None:
     url = "https://jules.googleapis.com/v1alpha/sessions"
     headers = {"X-Goog-Api-Key": jules_key, "Content-Type": "application/json"}
+
+    source_name = await _get_source_for_repo(owner, repo, jules_key)
+    if not source_name:
+        print(f"[JULES] No source found for {owner}/{repo}. Add it in Jules settings.")
+        return None
+
     body = {
         "title": f"JAT-AI: {branch}",
-        "repositoryOwner": owner,
-        "repositoryName": repo,
-        "repositoryBranch": branch,
         "prompt": prompt,
+        "sourceContext": {
+            "source": source_name,
+            "githubRepoContext": {
+                "startingBranch": branch,
+            }
+        }
     }
     async with httpx.AsyncClient(timeout=30.0) as client:
         res = await client.post(url, json=body, headers=headers)
     if res.status_code == 200:
         return res.json().get("name", "").split("/")[-1]
+    if res.status_code == 429:
+        await asyncio.sleep(60)
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            res = await client.post(url, json=body, headers=headers)
+        if res.status_code == 200:
+            return res.json().get("name", "").split("/")[-1]
+    print(f"[JULES] Session creation failed ({res.status_code}): {res.text[:300]}")
+    return None
+
+
+async def _get_source_for_repo(owner: str, repo: str, jules_key: str) -> str | None:
+    url = "https://jules.googleapis.com/v1alpha/sources"
+    headers = {"X-Goog-Api-Key": jules_key}
+    target = f"sources/github/{owner}/{repo}".lower()
+    page_token = None
+
+    while True:
+        params = {}
+        if page_token:
+            params["pageToken"] = page_token
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            res = await client.get(url, headers=headers, params=params)
+        if res.status_code != 200:
+            return None
+        data = res.json()
+        for s in data.get("sources", []):
+            if s.get("name", "").lower() == target:
+                return s.get("name", "")
+        page_token = data.get("nextPageToken")
+        if not page_token:
+            break
     return None
 
 
@@ -115,14 +163,85 @@ async def _approve_plan(session_id: str, jules_key: str) -> bool:
     return res.status_code == 200
 
 
-async def _answer_jules_question(session_data: dict, task_context: str, ai_key: str, ai_provider: str, ai_model: str) -> str:
+async def _fetch_recent_activities(session_id: str, jules_key: str, limit: int = 8) -> str:
+    """Fetch the most recent Jules activities so the AI can ground its answer in what
+    Jules has actually done so far, not just the latest question."""
+    url = f"https://jules.googleapis.com/v1alpha/sessions/{session_id}/activities"
+    headers = {"X-Goog-Api-Key": jules_key}
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            res = await client.get(url, headers=headers)
+        if res.status_code != 200:
+            return ""
+        acts = res.json().get("activities", [])
+    except Exception:
+        return ""
+
+    if not acts:
+        return ""
+
+    recent = acts[-limit:]
+    lines = []
+    for a in recent:
+        atype = a.get("type", "unknown")
+        state = a.get("state", "")
+        summary = a.get("summary") or a.get("content") or ""
+        if isinstance(summary, dict):
+            summary = summary.get("text") or summary.get("message") or str(summary)
+        summary = str(summary)[:200].replace("\n", " ").strip()
+        entry = f"- [{atype}"
+        if state:
+            entry += f"/{state}"
+        entry += "]"
+        if summary:
+            entry += f" {summary}"
+        lines.append(entry)
+    return "\n".join(lines)
+
+
+async def _answer_jules_question(
+    session_data: dict, task_context: str, ai_key: str, ai_provider: str, ai_model: str,
+    session_id: str = "", jules_key: str = "",
+) -> str:
     from api.chat import _call_provider
     question = session_data.get("lastMessage", {}).get("content", "Unknown question")
-    prompt = f"Jules is asking: {question}\n\nContext from planning phase:\n{task_context}\n\nAnswer concisely."
+
+    activity_summary = ""
+    if session_id and jules_key:
+        activity_summary = await _fetch_recent_activities(session_id, jules_key)
+
+    prompt_parts = [
+        f"Jules is working on a task and asking: {question}",
+        "",
+        f"Context from planning phase:\n{task_context}",
+    ]
+    if activity_summary:
+        prompt_parts.append("")
+        prompt_parts.append(f"Recent Jules activity (most recent last):\n{activity_summary}")
+    prompt_parts.extend([
+        "",
+        "Instructions:",
+        "1. If the question indicates all work is complete and exit criteria are met, "
+        "reply with exactly: [TASK_COMPLETE] All exit criteria satisfied.",
+        "2. If the question indicates work is NOT complete, tell Jules what remains "
+        "and instruct it to continue using its best judgment, searching the internet "
+        "for documentation or examples if needed.",
+        "3. If it's a clarification question, answer concisely based on the task "
+        "context and recent activity, then tell Jules to proceed.",
+        "Answer now:",
+    ])
+    prompt = "\n".join(prompt_parts)
+
     try:
         return await _call_provider(ai_key, ai_provider, ai_model, [{"role": "user", "content": prompt}], "")
-    except Exception:
-        return "Please proceed with your best judgment based on the task description."
+    except Exception as e:
+        if "429" in str(e) or "rate" in str(e).lower():
+            await asyncio.sleep(60)
+            try:
+                return await _call_provider(ai_key, ai_provider, ai_model, [{"role": "user", "content": prompt}], "")
+            except Exception:
+                pass
+        return "Check if all exit criteria are met. If yes, confirm completion. If not, continue working using your best judgment and search online for help if needed."
 
 
 async def poll_session_status(
@@ -146,7 +265,10 @@ async def poll_session_status(
         if state == "AWAITING_PLAN_APPROVAL":
             await _approve_plan(session_id, jules_key)
         elif state == "AWAITING_USER_INPUT" and ai_key:
-            answer = await _answer_jules_question(data, task_context, ai_key, ai_provider, ai_model)
+            answer = await _answer_jules_question(
+                data, task_context, ai_key, ai_provider, ai_model,
+                session_id=session_id, jules_key=jules_key,
+            )
             await send_message_to_session(session_id, answer, jules_key)
         await asyncio.sleep(15)
 

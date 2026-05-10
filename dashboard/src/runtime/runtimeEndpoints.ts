@@ -166,10 +166,10 @@ export const buildUsageHeatmapUrl = (
 
 export const buildConversationsUrl = (runtimeBaseUrl = readRuntimeBaseUrl()) => {
   if (!runtimeBaseUrl) {
-    return "/api/conversations";
+    return "/api/canvas/sessions";
   }
 
-  return buildAbsoluteUrl(runtimeBaseUrl, "/api/conversations");
+  return buildAbsoluteUrl(runtimeBaseUrl, "/api/canvas/sessions");
 };
 
 export const buildConversationSearchUrl = (

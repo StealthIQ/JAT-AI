@@ -25,21 +25,62 @@ settings = load_settings()
 
 async def _track_task(task: AgentTask, plan: ExecutionPlan, status: str, session_id: str | None = None):
     try:
-        await db.insert("agent_tasks", {
-            "prompt": task.description[:500],
+        existing = await db.select("agent_tasks", {
+            "session_id": session_id or "",
             "repo_owner": plan.repo_owner,
             "repo_name": plan.repo_name,
-            "status": status,
-            "session_id": session_id or "",
         })
+        if existing:
+            await db.update("agent_tasks", {"status": status}, {"id": existing[0]["id"]})
+        else:
+            await db.insert("agent_tasks", {
+                "prompt": task.description[:500],
+                "repo_owner": plan.repo_owner,
+                "repo_name": plan.repo_name,
+                "status": status,
+                "session_id": session_id or "",
+            })
     except Exception:
         pass
+
+
+async def _untrack_task(task: AgentTask, plan: ExecutionPlan):
+    try:
+        rows = await db.select("agent_tasks", {
+            "repo_owner": plan.repo_owner,
+            "repo_name": plan.repo_name,
+        })
+        for r in rows:
+            if r.get("prompt", "")[:100] == task.description[:100] and r.get("session_id", "") == "":
+                await db.delete("agent_tasks", {"id": r["id"]})
+    except Exception:
+        pass
+
+
+async def _resolve_ai_ctx(provider_type: str, model: str) -> dict:
+    """Fetch the first enabled API key for the requested provider so poll_session_status
+    can call the chat AI when Jules asks mid-session questions."""
+    if not provider_type or not model:
+        return {}
+    try:
+        rows = await db.select("ai_providers", filters={"provider_type": provider_type, "enabled": True})
+    except Exception:
+        rows = []
+    if not rows:
+        return {}
+    from api.chat import _decrypt_key
+    key = _decrypt_key(rows[0].get("api_key_encrypted", ""))
+    if not key:
+        return {}
+    return {"key": key, "provider": provider_type, "model": model}
 
 
 class ExecuteRequest(BaseModel):
     plan_json: str
     repo_owner: str
     repo_name: str
+    provider_type: str = ""
+    model: str = ""
 
 
 class TaskResult(BaseModel):
@@ -91,7 +132,7 @@ def _extract_pr_url(outputs: list[dict]) -> str | None:
     return None
 
 
-async def _run_task_once(task: AgentTask, plan: ExecutionPlan, base_sha: str, jules_key: str, token: str, task_index: int = 0) -> TaskResult:
+async def _run_task_once(task: AgentTask, plan: ExecutionPlan, base_sha: str, jules_key: str, token: str, task_index: int = 0, ai_ctx: dict | None = None) -> TaskResult:
     limiter = get_session_limiter()
     pipeline_id = f"{plan.repo_owner}/{plan.repo_name}"
 
@@ -105,6 +146,7 @@ async def _run_task_once(task: AgentTask, plan: ExecutionPlan, base_sha: str, ju
             plan.repo_owner, plan.repo_name, task.branch_name, base_sha, token
         )
         if not branch_created:
+            await _untrack_task(task, plan)
             return TaskResult(task_id=task.id, status="failed", error="Branch creation failed")
 
         prompt = await _resolve_prompt(task, plan, token, task_index)
@@ -113,9 +155,22 @@ async def _run_task_once(task: AgentTask, plan: ExecutionPlan, base_sha: str, ju
             branch=task.branch_name, jules_key=jules_key,
         )
         if not session_id:
+            await _untrack_task(task, plan)
             return TaskResult(task_id=task.id, status="failed", error="Session creation failed")
 
-        result = await poll_session_status(session_id, jules_key, plan.timeout_minutes)
+        ai = ai_ctx or {}
+        task_context = (
+            f"Task: {task.description}\n"
+            f"Branch: {task.branch_name}\n"
+            f"Exit criteria: {task.exit_criteria or 'Task completed as described'}"
+        )
+        result = await poll_session_status(
+            session_id, jules_key, plan.timeout_minutes,
+            task_context=task_context,
+            ai_key=ai.get("key", ""),
+            ai_provider=ai.get("provider", ""),
+            ai_model=ai.get("model", ""),
+        )
         state = result.get("state", "UNKNOWN")
 
         if state == "TIMEOUT":
@@ -187,41 +242,48 @@ async def _read_jdocs_context(owner: str, repo: str, token: str, branch: str = "
     return "No prior agent context available."
 
 
-async def _run_task(task: AgentTask, plan: ExecutionPlan, base_sha: str, jules_key: str, token: str, task_index: int = 0) -> TaskResult:
+async def _run_task(task: AgentTask, plan: ExecutionPlan, base_sha: str, jules_key: str, token: str, task_index: int = 0, ai_ctx: dict | None = None) -> TaskResult:
     max_retries = plan.max_retries if hasattr(plan, "max_retries") else 2
     for attempt in range(max_retries + 1):
-        result = await _run_task_once(task, plan, base_sha, jules_key, token, task_index)
+        result = await _run_task_once(task, plan, base_sha, jules_key, token, task_index, ai_ctx)
         if result.status == "completed":
+            return result
+        if result.error and ("creation failed" in result.error or "Branch creation" in result.error):
             return result
         if attempt < max_retries:
             task.branch_name = f"{task.branch_name}-retry{attempt + 1}"
     return result
 
 
-async def _execute_sequential(plan: ExecutionPlan, jules_key: str, token: str) -> list[TaskResult]:
+async def _execute_sequential(plan: ExecutionPlan, jules_key: str, token: str, ai_ctx: dict | None = None) -> list[TaskResult]:
     base_sha = await get_default_branch_sha(plan.repo_owner, plan.repo_name, token)
     if not base_sha:
         return [TaskResult(task_id=t.id, status="failed", error="Could not get base SHA") for t in plan.tasks]
 
     results = []
     for i, task in enumerate(plan.tasks):
-        result = await _run_task(task, plan, base_sha, jules_key, token, i)
+        result = await _run_task(task, plan, base_sha, jules_key, token, i, ai_ctx)
         results.append(result)
         if result.status == "failed":
             break
     return results
 
 
-async def _execute_parallel(plan: ExecutionPlan, jules_key: str, token: str) -> list[TaskResult]:
+async def _execute_parallel(plan: ExecutionPlan, jules_key: str, token: str, ai_ctx: dict | None = None) -> list[TaskResult]:
     base_sha = await get_default_branch_sha(plan.repo_owner, plan.repo_name, token)
     if not base_sha:
         return [TaskResult(task_id=t.id, status="failed", error="Could not get base SHA") for t in plan.tasks]
 
-    coros = [_run_task(task, plan, base_sha, jules_key, token, i) for i, task in enumerate(plan.tasks)]
-    return await asyncio.gather(*coros)
+    # Stagger to avoid rate limiting
+    tasks = []
+    for i, task in enumerate(plan.tasks):
+        coro = _run_task(task, plan, base_sha, jules_key, token, i, ai_ctx)
+        tasks.append(asyncio.create_task(coro))
+        await asyncio.sleep(2)
+    return await asyncio.gather(*tasks)
 
 
-async def _execute_hybrid(plan: ExecutionPlan, jules_key: str, token: str) -> list[TaskResult]:
+async def _execute_hybrid(plan: ExecutionPlan, jules_key: str, token: str, ai_ctx: dict | None = None) -> list[TaskResult]:
     base_sha = await get_default_branch_sha(plan.repo_owner, plan.repo_name, token)
     if not base_sha:
         return [TaskResult(task_id=t.id, status="failed", error="Could not get base SHA") for t in plan.tasks]
@@ -235,7 +297,7 @@ async def _execute_hybrid(plan: ExecutionPlan, jules_key: str, token: str) -> li
         if not ready:
             break
 
-        coros = [_run_task(t, plan, base_sha, jules_key, token, plan.tasks.index(t)) for t in ready]
+        coros = [_run_task(t, plan, base_sha, jules_key, token, plan.tasks.index(t), ai_ctx) for t in ready]
         batch_results = await asyncio.gather(*coros)
 
         for task, result in zip(ready, batch_results):
@@ -257,19 +319,28 @@ async def execute_plan(request: ExecuteRequest):
 
     token = settings.github_token
     if not token:
-        raise HTTPException(400, "No GitHub token configured")
+        raise HTTPException(400, "No GitHub token configured in .env")
 
     try:
         plan = parse_plan(request.plan_json, request.repo_owner, request.repo_name)
     except Exception as e:
         raise HTTPException(400, f"Invalid plan: {e}")
 
+    ai_ctx = await _resolve_ai_ctx(request.provider_type, request.model)
+
+    # Initialize .jules/jdocs on the default branch so agents have shared context
+    try:
+        from core.jdocs import init_jdocs
+        await init_jdocs(plan.repo_owner, plan.repo_name, "main", token)
+    except Exception as e:
+        print(f"[JDOCS] Init failed (non-fatal): {e}")
+
     if plan.execution_mode == "parallel":
-        results = await _execute_parallel(plan, jules_key, token)
+        results = await _execute_parallel(plan, jules_key, token, ai_ctx)
     elif plan.execution_mode == "hybrid":
-        results = await _execute_hybrid(plan, jules_key, token)
+        results = await _execute_hybrid(plan, jules_key, token, ai_ctx)
     else:
-        results = await _execute_sequential(plan, jules_key, token)
+        results = await _execute_sequential(plan, jules_key, token, ai_ctx)
 
     all_done = all(r.status == "completed" for r in results)
 
