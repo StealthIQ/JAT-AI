@@ -36,7 +36,8 @@ dev = [
 ]
 
 [project.scripts]
-jat = "src.cli:main"
+jat = "src.server_launcher:main"
+jat-cli = "src.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src"]
