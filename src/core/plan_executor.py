@@ -165,4 +165,4 @@ async def get_jules_key() -> str | None:
     daily_limit = best.get("max_daily_tasks", 300)
     if best.get("sessions_today", 0) >= daily_limit:
         return None
-    return best.get("api_key", "")
+    return best.get("api_key_encrypted", "") or best.get("api_key", "")
