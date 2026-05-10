@@ -33,7 +33,7 @@ export const SearchableDropdown = memo(({
         onClick={() => { if (!disabled) setOpen((o) => !o); }}
         disabled={disabled}
       >
-        {disabled ? "Loading..." : label}
+        {label}
         <span className="chat-model-dropdown-arrow">▾</span>
       </button>
       {open && (

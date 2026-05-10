@@ -144,7 +144,7 @@ export const ChatPrimaryView = () => {
   const fetchConversations = useCallback(() => {
     fetch("/api/conversations").then((r) => r.json()).then((d) => {
       const convs = (d.conversations ?? []).map((c: any) => ({
-        id: c.id, title: c.title || "Untitled", messages: [], createdAt: c.created_at, updatedAt: c.updated_at || c.created_at, model: c.model,
+        id: c.id, title: c.title || "Untitled", messages: [], createdAt: c.created_at, updatedAt: c.updated_at || c.created_at, model: c.model, providerType: c.provider_type || "", repo: c.repo_name || "",
       }));
       convs.sort((a: Conversation, b: Conversation) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
       setConversations((prev) => {
@@ -187,7 +187,15 @@ export const ChatPrimaryView = () => {
     const conv = conversations.find((c) => c.id === activeConvId);
     if (conv?.model) setSelectedModel(conv.model);
     if (conv?.repo) setSelectedRepo(conv.repo);
-    if (conv?.providerType) setSelectedProviderType(conv.providerType);
+    if (conv?.providerType) {
+      setSelectedProviderType(conv.providerType);
+    } else if (conv?.model) {
+      // Infer provider from model name for conversations that predate provider_type storage
+      const m = conv.model.toLowerCase();
+      if (m.includes("deepseek")) setSelectedProviderType("deepseek");
+      else if (m.includes("yi-") || m.includes("01-ai")) setSelectedProviderType("nvidia_nim");
+      else if (m.includes("longcat")) setSelectedProviderType("longcat");
+    }
   }, [activeConvId]);
 
   // Persist dropdown selections to the active conversation

@@ -115,6 +115,7 @@ class LocalDB:
                 repo_owner TEXT DEFAULT '',
                 repo_name TEXT DEFAULT '',
                 model TEXT DEFAULT '',
+                provider_type TEXT DEFAULT '',
                 status TEXT DEFAULT 'active',
                 created_at TEXT DEFAULT (datetime('now')),
                 updated_at TEXT DEFAULT (datetime('now'))

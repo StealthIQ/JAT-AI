@@ -31,9 +31,12 @@ class MessageCreate(BaseModel):
 @router.get("/api/conversations")
 async def list_conversations():
     try:
-        rows = await db.select("conversations", columns="id, title, mode, repo_owner, repo_name, model, status, created_at, updated_at", order_by="updated_at DESC")
+        rows = await db.select("conversations", columns="id, title, mode, repo_owner, repo_name, model, provider_type, status, created_at, updated_at", order_by="updated_at DESC")
     except Exception:
-        return {"conversations": []}
+        try:
+            rows = await db.select("conversations", order_by="updated_at DESC")
+        except Exception:
+            return {"conversations": []}
     return {"conversations": rows}
 
 
@@ -45,6 +48,7 @@ async def create_conversation(body: ConversationCreate):
         "repo_owner": body.repo_owner,
         "repo_name": body.repo_name,
         "model": body.model,
+        "provider_type": body.provider_type,
     })
     return row
 
