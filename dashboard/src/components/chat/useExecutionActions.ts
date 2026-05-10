@@ -65,7 +65,10 @@ export function useExecutionActions(
         repo_name: selectedRepo,
       }),
     })
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) return r.json().then((d: any) => { throw new Error(d.detail ?? `Execute failed (${r.status})`); });
+        return r.json();
+      })
       .then((data) => {
         const status = data.status === "completed" ? "All tasks completed" : `Execution: ${data.status}`;
         setExecutionStatus(status);
