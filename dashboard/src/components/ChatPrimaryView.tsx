@@ -184,19 +184,26 @@ export const ChatPrimaryView = () => {
       next.delete(activeConvId);
       return next;
     });
+  }, [activeConvId]);
+
+  // Restore provider/model/repo when conversation data becomes available
+  const restoredConvRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!activeConvId || restoredConvRef.current === activeConvId) return;
     const conv = conversations.find((c) => c.id === activeConvId);
-    if (conv?.model) setSelectedModel(conv.model);
-    if (conv?.repo) setSelectedRepo(conv.repo);
-    if (conv?.providerType) {
+    if (!conv || !conv.model) return;
+    restoredConvRef.current = activeConvId;
+    setSelectedModel(conv.model);
+    if (conv.repo) setSelectedRepo(conv.repo);
+    if (conv.providerType) {
       setSelectedProviderType(conv.providerType);
-    } else if (conv?.model) {
-      // Infer provider from model name for conversations that predate provider_type storage
+    } else {
       const m = conv.model.toLowerCase();
       if (m.includes("deepseek")) setSelectedProviderType("deepseek");
       else if (m.includes("yi-") || m.includes("01-ai")) setSelectedProviderType("nvidia_nim");
       else if (m.includes("longcat")) setSelectedProviderType("longcat");
     }
-  }, [activeConvId]);
+  }, [activeConvId, conversations]);
 
   // Persist dropdown selections to the active conversation
   useEffect(() => {
