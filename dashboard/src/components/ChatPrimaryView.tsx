@@ -184,6 +184,7 @@ export const ChatPrimaryView = () => {
       next.delete(activeConvId);
       return next;
     });
+    exec.resetExecution();
   }, [activeConvId]);
 
   // Restore provider/model/repo when conversation data becomes available
