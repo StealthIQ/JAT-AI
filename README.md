@@ -1,14 +1,19 @@
 # JAT-AI -- Jules Agent Tree
 
-<p align="center">
-  <img src=".github/assets/image.png" alt="JAT-AI screenshot 1" width="100%" />
-  <img src=".github/assets/image2.png" alt="JAT-AI screenshot 2" width="100%" />
-  <img src=".github/assets/image3.png" alt="JAT-AI screenshot 3" width="100%" />
-  <img src=".github/assets/image4.png" alt="JAT-AI screenshot 4" width="100%" />
-  <img src=".github/assets/image5.png" alt="JAT-AI screenshot 5" width="100%" />
-  <img src=".github/assets/image6.png" alt="JAT-AI screenshot 6" width="100%" />
-  <img src=".github/assets/image7.png" alt="JAT-AI screenshot 7" width="100%" />
-</p>
+<table>
+  <tr>
+    <td width="25%"><img src=".github/assets/image.png" alt="screenshot 1" /></td>
+    <td width="25%"><img src=".github/assets/image2.png" alt="screenshot 2" /></td>
+    <td width="25%"><img src=".github/assets/image3.png" alt="screenshot 3" /></td>
+    <td width="25%"><img src=".github/assets/image4.png" alt="screenshot 4" /></td>
+  </tr>
+  <tr>
+    <td width="25%"><img src=".github/assets/image5.png" alt="screenshot 5" /></td>
+    <td width="25%"><img src=".github/assets/image6.png" alt="screenshot 6" /></td>
+    <td width="25%"><img src=".github/assets/image7.png" alt="screenshot 7" /></td>
+    <td width="25%"></td>
+  </tr>
+</table>
 
 A distributed orchestrator for Google Jules AI coding agent. Manages multiple Jules accounts, coordinates async agent workflows, persists context memory in Supabase, and auto-merges pull requests.
 
