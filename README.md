@@ -17,6 +17,52 @@
 
 A distributed orchestrator for Google Jules AI coding agent. Manages multiple Jules accounts, coordinates async agent workflows, persists context memory in Supabase, and auto-merges pull requests.
 
+## Quick Start
+
+Clone the repo, run the installer, and launch.
+
+**Windows (PowerShell or CMD):**
+```bat
+git clone https://github.com/iceyxsm/JAT-AI.git
+cd JAT-AI
+scripts\install.bat
+```
+
+Then open a **new terminal** (so the updated PATH is loaded) and run:
+```bat
+jat
+```
+
+**macOS / Linux:**
+```bash
+git clone https://github.com/iceyxsm/JAT-AI.git
+cd JAT-AI
+bash scripts/install.sh
+```
+
+Then run:
+```bash
+jat
+```
+
+That's it. `jat` starts the backend (FastAPI on `http://localhost:8000`) and the frontend (Vite on `http://localhost:5173`), then opens the dashboard in your browser. Press `Ctrl+C` in the terminal to stop both.
+
+### What the installer does
+
+1. Installs the Python package in editable mode (`pip install -e .`), which registers the `jat` and `jat-cli` commands.
+2. Installs the dashboard's npm dependencies (`cd dashboard && npm install`).
+3. Sets up the `jat` command on your PATH (`~/jat.cmd` on Windows, `/usr/local/bin/jat` on macOS/Linux).
+
+### Before your first run
+
+Create a `.env` file at the repo root (copy from `.env.example`) with at minimum:
+```
+JULES_API_KEY=your_jules_key
+GITHUB_TOKEN=your_github_pat
+```
+
+The dashboard's APIs page can manage these at runtime too, but the backend reads them from `.env` on startup.
+
 ## What It Does
 
 JAT-AI treats Jules sessions as nodes in a workflow tree. A parent task can spawn child tasks that run in parallel across different Jules accounts. Children share context through a central Supabase store. When a child finishes and creates a PR, the orchestrator can automatically merge it after CI passes. Other agents waiting on that result get notified and continue their work.
@@ -160,13 +206,16 @@ examples/
     workflow_parallel.json  Example parallel workflow
 ```
 
-## Setup
+## Setup (manual, if the installer fails)
 
 1. Clone and install:
    ```bash
    git clone https://github.com/iceyxsm/JAT-AI.git
    cd JAT-AI
    pip install -e ".[dev]"
+   cd dashboard
+   npm install
+   cd ..
    ```
 
 2. Configure `.env`:
