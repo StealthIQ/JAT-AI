@@ -119,7 +119,7 @@ export const useCanvasTransform = (): UseCanvasTransformResult => {
     [transform],
   );
 
-  const handleWheel = useCallback((e: React.WheelEvent<SVGSVGElement>) => {
+  const handleWheel = useCallback((e: WheelEvent) => {
     e.preventDefault();
     const svg = svgRef.current;
     if (!svg) return;
@@ -141,6 +141,14 @@ export const useCanvasTransform = (): UseCanvasTransformResult => {
       };
     });
   }, []);
+
+  // Attach wheel listener natively with { passive: false } so preventDefault works
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    svg.addEventListener("wheel", handleWheel, { passive: false });
+    return () => svg.removeEventListener("wheel", handleWheel);
+  }, [handleWheel]);
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent<SVGSVGElement>) => {
@@ -247,7 +255,6 @@ export const useCanvasTransform = (): UseCanvasTransformResult => {
     transform,
     isPanning,
     svgRef,
-    handleWheel,
     handlePointerDown,
     handlePointerMove,
     handlePointerUp,

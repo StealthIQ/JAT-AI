@@ -17,7 +17,6 @@ def _mask_secrets(_, __, event_dict: dict) -> dict:
 
 
 class Settings(BaseSettings):
-    jules_api_key: str = ""
     github_token: str = ""
     github_fg_token: str = ""
     supabase_url: str = ""

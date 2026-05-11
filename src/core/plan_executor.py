@@ -112,12 +112,14 @@ async def create_jules_session(prompt: str, owner: str, repo: str, branch: str, 
     async with httpx.AsyncClient(timeout=30.0) as client:
         res = await client.post(url, json=body, headers=headers)
     if res.status_code == 200:
+        await _increment_sessions_today()
         return res.json().get("name", "").split("/")[-1]
     if res.status_code == 429:
         await asyncio.sleep(60)
         async with httpx.AsyncClient(timeout=30.0) as client:
             res = await client.post(url, json=body, headers=headers)
         if res.status_code == 200:
+            await _increment_sessions_today()
             return res.json().get("name", "").split("/")[-1]
     print(f"[JULES] Session creation failed ({res.status_code}): {res.text[:300]}")
     return None
@@ -297,3 +299,28 @@ async def get_jules_key() -> str | None:
         return vault.decrypt(encrypted)
     except Exception:
         return encrypted
+
+
+async def _increment_sessions_today():
+    """Bump sessions_today on the active account after a successful session creation."""
+    try:
+        rows = await db.select("accounts")
+        enabled = [r for r in rows if r.get("enabled", True)]
+        if not enabled:
+            return
+        best = min(enabled, key=lambda r: r.get("sessions_today", 0))
+        new_count = best.get("sessions_today", 0) + 1
+        await db.update("accounts", {"sessions_today": new_count}, {"id": best["id"]})
+    except Exception:
+        pass
+
+
+async def reset_daily_sessions():
+    """Reset sessions_today to 0 for all accounts. Call this on a new day."""
+    try:
+        rows = await db.select("accounts")
+        for r in rows:
+            if r.get("sessions_today", 0) > 0:
+                await db.update("accounts", {"sessions_today": 0}, {"id": r["id"]})
+    except Exception:
+        pass

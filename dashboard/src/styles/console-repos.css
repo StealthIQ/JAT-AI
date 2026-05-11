@@ -31,7 +31,7 @@
 }
 
 .repos-refresh-btn {
-  margin-left: auto;
+  margin-left: 0.5rem;
   background: color-mix(in srgb, var(--accent-primary) 14%, #11161d);
   border: 1px solid color-mix(in srgb, var(--accent-primary) 40%, #2b2f36);
   color: var(--accent-primary);
@@ -44,6 +44,22 @@
 
 .repos-refresh-btn:hover {
   background: color-mix(in srgb, var(--accent-primary) 24%, #11161d);
+}
+
+.repos-search {
+  margin-left: auto;
+  padding: 0.3rem 0.6rem;
+  background: #11161d;
+  border: 1px solid #2a3545;
+  border-radius: 4px;
+  color: #e6e8ec;
+  font-size: 0.8rem;
+  width: 180px;
+  outline: none;
+}
+
+.repos-search:focus {
+  border-color: var(--accent-primary);
 }
 
 .repos-grid {

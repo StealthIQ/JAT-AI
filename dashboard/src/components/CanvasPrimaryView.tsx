@@ -315,7 +315,6 @@ export const CanvasPrimaryView = ({
     transform,
     isPanning,
     svgRef,
-    handleWheel,
     handlePointerDown: handleCanvasPointerDown,
     handlePointerMove: handleCanvasPointerMove,
     handlePointerUp: handleCanvasPointerUp,
@@ -1051,7 +1050,6 @@ export const CanvasPrimaryView = ({
           aria-label="Canvas graph"
           ref={svgRef}
           className={`canvas-svg${isPanning || dragNodeId ? " canvas-svg--panning" : ""}`}
-          onWheel={handleWheel}
           onPointerDown={handleCanvasPointerDown}
           onPointerMove={handleSvgPointerMove}
           onPointerUp={handleSvgPointerUp}

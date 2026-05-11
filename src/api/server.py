@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from contextlib import asynccontextmanager
 
 import httpx
@@ -29,9 +30,219 @@ def _now() -> str:
 settings = load_settings()
 
 
+async def _find_session_by_prompt(task_row: dict, jules_key: str) -> str | None:
+    """When session_id is missing (server crashed before it was saved), search recent
+    Jules sessions by title pattern and creation time to recover the link."""
+    prompt_prefix = task_row.get("prompt", "")[:40].lower()
+    repo = f"{task_row.get('repo_owner', '')}/{task_row.get('repo_name', '')}"
+    task_created = task_row.get("created_at", "")
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            res = await client.get(
+                "https://jules.googleapis.com/v1alpha/sessions?pageSize=20",
+                headers={"X-Goog-Api-Key": jules_key},
+            )
+        if res.status_code != 200:
+            return None
+        for s in res.json().get("sessions", []):
+            title = s.get("title", "").lower()
+            source = s.get("sourceContext", {}).get("source", "").lower()
+            create_time = s.get("createTime", "")
+
+            # Match by title containing the prompt prefix
+            title_match = prompt_prefix and prompt_prefix[:20] in title
+            # Match by repo + JAT-AI prefix in title
+            repo_match = repo.lower() in source and "jat-ai" in title
+            # Timestamp proximity check (within 5 minutes of task creation)
+            time_match = _times_within_minutes(task_created, create_time, 5)
+
+            if (title_match or repo_match) and time_match:
+                return s.get("name", "").split("/")[-1]
+            # Fallback: title match alone if no timestamp available
+            if title_match and not task_created:
+                return s.get("name", "").split("/")[-1]
+    except Exception:
+        pass
+    return None
+
+
+def _times_within_minutes(local_time: str, jules_time: str, minutes: int) -> bool:
+    """Check if two timestamps are within N minutes of each other.
+    local_time: '2026-05-10 06:38:49', jules_time: '2026-05-10T06:38:00Z'"""
+    if not local_time or not jules_time:
+        return True  # Can't compare — assume match
+    from datetime import datetime, timezone
+    try:
+        lt = local_time.replace("T", " ").replace("Z", "")[:19]
+        jt = jules_time.replace("T", " ").replace("Z", "")[:19]
+        local_dt = datetime.strptime(lt, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+        jules_dt = datetime.strptime(jt, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+        return abs((local_dt - jules_dt).total_seconds()) < minutes * 60
+    except Exception:
+        return True  # Parse failure — don't block on this
+
+
+async def _recover_orphaned_tasks():
+    """On startup, check tasks stuck as 'running' and sync their actual state from Jules."""
+    await asyncio.sleep(2)  # Let the DB connection settle
+    try:
+        rows = await db.select("agent_tasks", {"status": "running"})
+    except Exception:
+        return
+    if not rows:
+        return
+
+    from core.plan_executor import get_jules_key, poll_session_status
+
+    jules_key = await get_jules_key()
+    if not jules_key:
+        return
+
+    print(f"[RECOVERY] Found {len(rows)} orphaned running tasks, syncing with Jules...")
+
+    for row in rows:
+        session_id = row.get("session_id", "")
+        if not session_id:
+            # Server may have crashed before session_id was saved — try to find it on Jules by title
+            session_id = await _find_session_by_prompt(row, jules_key)
+            if session_id:
+                await db.update("agent_tasks", {"session_id": session_id}, {"id": row["id"]})
+            else:
+                await db.update("agent_tasks", {"status": "failed"}, {"id": row["id"]})
+                continue
+
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                res = await client.get(
+                    f"https://jules.googleapis.com/v1alpha/sessions/{session_id}",
+                    headers={"X-Goog-Api-Key": jules_key},
+                )
+            if res.status_code != 200:
+                await db.update("agent_tasks", {"status": "failed"}, {"id": row["id"]})
+                continue
+
+            state = res.json().get("state", "")
+            if state == "COMPLETED":
+                await db.update("agent_tasks", {"status": "completed"}, {"id": row["id"]})
+                print(f"[RECOVERY] {session_id}: completed")
+            elif state == "FAILED":
+                await db.update("agent_tasks", {"status": "failed"}, {"id": row["id"]})
+                print(f"[RECOVERY] {session_id}: failed")
+            elif state in ("IN_PROGRESS", "AWAITING_PLAN_APPROVAL", "AWAITING_USER_INPUT", "QUEUED", "PLANNING"):
+                # Still active on Jules — resume polling in background
+                asyncio.create_task(_resume_polling(row, session_id, jules_key))
+                print(f"[RECOVERY] {session_id}: still running, resuming poll")
+            else:
+                await db.update("agent_tasks", {"status": "failed"}, {"id": row["id"]})
+        except Exception as e:
+            print(f"[RECOVERY] {session_id}: error checking state: {e}")
+            await db.update("agent_tasks", {"status": "failed"}, {"id": row["id"]})
+
+    # After syncing running tasks, check for pending tasks that never started
+    await _resume_pending_tasks(jules_key)
+
+
+async def _resume_polling(task_row: dict, session_id: str, jules_key: str):
+    """Resume polling a still-active Jules session and update the DB when it finishes."""
+    from core.plan_executor import poll_session_status
+
+    task_context = (
+        f"Task: {task_row.get('prompt', '')}\n"
+        f"Repo: {task_row.get('repo_owner', '')}/{task_row.get('repo_name', '')}"
+    )
+
+    result = await poll_session_status(
+        session_id, jules_key, timeout_minutes=20,
+        task_context=task_context,
+    )
+    state = result.get("state", "UNKNOWN")
+    new_status = "completed" if state == "COMPLETED" else "failed"
+    await db.update("agent_tasks", {"status": new_status}, {"id": task_row["id"]})
+    print(f"[RECOVERY] {session_id}: poll finished -> {new_status}")
+
+
+async def _resume_pending_tasks(jules_key: str):
+    """Resume execution of tasks stuck as 'pending' after a crash.
+    Reads the persisted execution context to reconstruct provider/model/mode."""
+    try:
+        pending = await db.select("agent_tasks", {"status": "pending"})
+    except Exception:
+        pending = []
+    if not pending:
+        return
+
+    from api.execute import (
+        _load_execution_context, _clear_execution_context,
+        _resolve_ai_ctx, _run_task_once, _track_task,
+        AgentTask, ExecutionPlan,
+    )
+    from core.plan_executor import get_default_branch_sha
+
+    ctx = await _load_execution_context()
+    if not ctx:
+        print(f"[RECOVERY] {len(pending)} pending tasks but no execution context — cannot resume")
+        return
+
+    print(f"[RECOVERY] Resuming {len(pending)} pending tasks ({ctx.get('execution_mode', 'sequential')} mode)...")
+
+    token = settings.github_token
+    if not token:
+        print("[RECOVERY] No GitHub token — cannot resume pending tasks")
+        return
+
+    ai_ctx = await _resolve_ai_ctx(ctx.get("provider_type", ""), ctx.get("model", ""))
+    base_sha = await get_default_branch_sha(ctx["repo_owner"], ctx["repo_name"], token)
+    if not base_sha:
+        print("[RECOVERY] Could not get base SHA — cannot resume")
+        return
+
+    plan = ExecutionPlan(
+        repo_owner=ctx["repo_owner"],
+        repo_name=ctx["repo_name"],
+        tasks=[],
+        execution_mode=ctx.get("execution_mode", "sequential"),
+        max_retries=ctx.get("max_retries", 2),
+        timeout_minutes=ctx.get("timeout_minutes", 20),
+    )
+
+    for i, row in enumerate(pending):
+        task = AgentTask(
+            id=row.get("id", f"agent-{i+1}"),
+            description=row.get("prompt", ""),
+            branch_name=f"jat/agent-{i+1}-recovery",
+        )
+        plan.tasks.append(task)
+
+    # Execute sequentially regardless of original mode (safest for recovery)
+    for i, task in enumerate(plan.tasks):
+        result = await _run_task_once(task, plan, base_sha, jules_key, token, i, ai_ctx)
+        print(f"[RECOVERY] Task '{task.description[:40]}': {result.status}")
+        if result.status == "failed" and plan.execution_mode == "sequential":
+            break
+
+    await _clear_execution_context()
+    print("[RECOVERY] Pending task resume complete")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    asyncio.create_task(_recover_orphaned_tasks())
+    asyncio.create_task(_daily_reset_loop())
     yield
+
+
+async def _daily_reset_loop():
+    """Reset sessions_today at midnight UTC each day."""
+    from datetime import datetime, timezone, timedelta
+    from core.plan_executor import reset_daily_sessions
+
+    while True:
+        now = datetime.now(timezone.utc)
+        tomorrow = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+        seconds_until_midnight = (tomorrow - now).total_seconds()
+        await asyncio.sleep(seconds_until_midnight)
+        await reset_daily_sessions()
+        print("[DAILY] Reset sessions_today counters")
 
 
 app = FastAPI(title="JAT-AI API", lifespan=lifespan)
@@ -251,7 +462,7 @@ async def list_tentacles():
         if repo["todoDone"] == repo["todoTotal"] and repo["todoTotal"] > 0:
             repo["status"] = "idle"
             repo["octopus"]["animation"] = "sleeping"
-            repo["octopus"]["expression"] = "sleeping"
+            repo["octopus"]["expression"] = "sleepy"
         elif repo["_has_running"]:
             repo["status"] = "active"
             repo["octopus"]["animation"] = "working"
@@ -276,7 +487,7 @@ async def list_canvas_sessions():
 
     sessions = []
     for t in tasks:
-        is_done = t["status"] == "completed"
+        is_done = t["status"] in ("completed", "failed")
         preview = t.get("prompt", "")[:60]
         sessions.append({
             "sessionId": t.get("session_id") or t["id"],
@@ -300,8 +511,19 @@ async def list_canvas_sessions():
 async def get_usage():
     accounts = await db.select("accounts")
     total_daily = sum(a.get("max_daily_tasks", 0) for a in accounts)
-    sessions_today = sum(a.get("sessions_today", 0) for a in accounts)
     active_count = len([a for a in accounts if a.get("enabled")])
+
+    # Query Jules API for real today's session count across all accounts
+    sessions_today = await _count_today_sessions(accounts)
+
+    # Sync the local counter with reality
+    if accounts and sessions_today > 0:
+        try:
+            best = accounts[0]
+            await db.update("accounts", {"sessions_today": sessions_today}, {"id": best["id"]})
+        except Exception:
+            pass
+
     pct = int((sessions_today / total_daily) * 100) if total_daily > 0 else 0
     return {
         "status": "ok",
@@ -316,6 +538,46 @@ async def get_usage():
         "extraUsageCostLimit": total_daily,
         "message": f"{sessions_today}/{total_daily} daily sessions | {active_count} account{'s' if active_count != 1 else ''}",
     }
+
+
+async def _count_today_sessions(accounts: list[dict]) -> int:
+    """Query Jules API with each account key and count sessions created today."""
+    from datetime import datetime, timezone
+    from core.ai_interface import KeyVault
+    vault = KeyVault(settings.encryption_key)
+
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    total = 0
+
+    for acc in accounts:
+        if not acc.get("enabled"):
+            continue
+        encrypted = acc.get("api_key_encrypted", "")
+        if not encrypted:
+            continue
+        try:
+            key = vault.decrypt(encrypted)
+        except Exception:
+            key = encrypted
+        if not key:
+            continue
+
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                res = await client.get(
+                    "https://jules.googleapis.com/v1alpha/sessions?pageSize=100",
+                    headers={"X-Goog-Api-Key": key},
+                )
+            if res.status_code != 200:
+                continue
+            for s in res.json().get("sessions", []):
+                create_time = s.get("createTime", "")
+                if create_time.startswith(today):
+                    total += 1
+        except Exception:
+            continue
+
+    return total
 
 
 @app.get("/api/ui-state")
@@ -359,7 +621,8 @@ async def get_codex_usage():
 
 
 async def _fetch_jules_repos_as_tentacles() -> dict[str, dict]:
-    jules_key = settings.jules_api_key
+    from core.plan_executor import get_jules_key
+    jules_key = await get_jules_key() or ""
     if not jules_key:
         return {}
     try:
@@ -399,41 +662,84 @@ async def _fetch_jules_repos_as_tentacles() -> dict[str, dict]:
         return {}
 
 
-async def _fetch_jules_sessions(headers: dict) -> tuple[dict[str, list[dict]], set[str], set[str]]:
+async def _fetch_jules_sessions_all_accounts() -> tuple[dict[str, list[dict]], set[str]]:
+    """Query all enabled Jules accounts and aggregate sessions by date."""
+    from core.ai_interface import KeyVault
+    vault = KeyVault(settings.encryption_key)
+
     sessions_by_date: dict[str, list[dict]] = {}
     projects: set[str] = set()
-    models: set[str] = set()
+
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            res = await client.get("https://jules.googleapis.com/v1alpha/sessions?pageSize=100", headers=headers)
-            if res.status_code == 200:
-                for s in res.json().get("sessions", []):
+        accounts = await db.select("accounts")
+    except Exception:
+        accounts = []
+
+    for acc in accounts:
+        if not acc.get("enabled"):
+            continue
+        encrypted = acc.get("api_key_encrypted", "")
+        if not encrypted:
+            continue
+        try:
+            key = vault.decrypt(encrypted)
+        except Exception:
+            key = encrypted
+        if not key:
+            continue
+
+        page_token = None
+        while True:
+            try:
+                params: dict[str, str] = {"pageSize": "100"}
+                if page_token:
+                    params["pageToken"] = page_token
+                async with httpx.AsyncClient(timeout=15.0) as client:
+                    res = await client.get(
+                        "https://jules.googleapis.com/v1alpha/sessions",
+                        headers={"X-Goog-Api-Key": key},
+                        params=params,
+                    )
+                if res.status_code != 200:
+                    break
+                data = res.json()
+                for s in data.get("sessions", []):
                     date = s.get("createTime", "")[:10]
                     if not date:
                         continue
                     source = s.get("sourceContext", {}).get("source", "")
                     repo = source.replace("sources/github/", "") if source else "unknown"
                     projects.add(repo)
-                    models.add("jules-ultra")
                     if date not in sessions_by_date:
                         sessions_by_date[date] = []
-                    sessions_by_date[date].append({"repo": repo})
-    except (httpx.ReadTimeout, httpx.ConnectTimeout):
-        pass
-    return sessions_by_date, projects, models
+                    sessions_by_date[date].append({
+                        "repo": repo,
+                        "account": acc.get("name", ""),
+                        "state": s.get("state", ""),
+                        "title": s.get("title", ""),
+                    })
+                page_token = data.get("nextPageToken")
+                if not page_token:
+                    break
+            except (httpx.ReadTimeout, httpx.ConnectTimeout):
+                break
+
+    return sessions_by_date, projects
 
 
 @app.get("/api/analytics/usage-heatmap")
 async def get_usage_heatmap():
-    jules_key = settings.jules_api_key
-    headers_jules = {"X-Goog-Api-Key": jules_key} if jules_key else {}
     from datetime import datetime, timezone, timedelta
     now = datetime.now(timezone.utc)
+
+    sessions_by_date, projects = await _fetch_jules_sessions_all_accounts()
+
+    # Only include last 30 days
+    cutoff = (now - timedelta(days=30)).strftime("%Y-%m-%d")
     days: list[dict] = []
-    projects: set[str] = set()
-    sessions_by_date: dict[str, list[dict]] = {}
-    if jules_key:
-        sessions_by_date, projects, _ = await _fetch_jules_sessions(headers_jules)
+    total_sessions = 0
+    total_days_active = 0
+
     for i in range(30):
         date = (now - timedelta(days=29 - i)).strftime("%Y-%m-%d")
         day_sessions = sessions_by_date.get(date, [])
@@ -441,6 +747,9 @@ async def get_usage_heatmap():
         for s in day_sessions:
             day_projects[s["repo"]] = day_projects.get(s["repo"], 0) + 1
         count = len(day_sessions)
+        total_sessions += count
+        if count > 0:
+            total_days_active += 1
         days.append({
             "date": date,
             "totalTokens": count,
@@ -448,8 +757,15 @@ async def get_usage_heatmap():
             "projects": [{"key": k, "tokens": v} for k, v in day_projects.items()] if day_projects else [{"key": "none", "tokens": 0}],
             "models": [{"key": "sessions", "tokens": count}],
         })
+
     all_projects = sorted(projects) if projects else ["none"]
-    return {"days": days, "projects": all_projects, "models": ["sessions"]}
+    return {
+        "days": days,
+        "projects": all_projects,
+        "models": ["sessions"],
+        "totalSessions": total_sessions,
+        "totalDaysActive": total_days_active,
+    }
 
 
 @app.get("/api/monitor/feed")

@@ -32,6 +32,7 @@ export const ReposPrimaryView = () => {
   const [repos, setRepos] = useState<RepoCard[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [hasGithubKey, setHasGithubKey] = useState(true);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     fetch("/api/settings/status").then((r) => {
@@ -57,7 +58,7 @@ export const ReposPrimaryView = () => {
         fullName: t.description ?? t.name ?? "",
         defaultBranch: "main",
         isPrivate: false,
-        tasks: (t.todos ?? []).map((todo: any, i: number) => ({
+        tasks: (t.todoItems ?? t.todos ?? []).map((todo: any, i: number) => ({
           id: `${t.tentacleId}-${i}`,
           prompt: todo.text ?? todo.label ?? "",
           status: todo.done ? "completed" : "pending",
@@ -93,6 +94,13 @@ export const ReposPrimaryView = () => {
         <span className="repos-summary">
           {repos.length} repos · {completedCount}/{totalTasks} tasks done
         </span>
+        <input
+          type="text"
+          className="repos-search"
+          placeholder="Search repos or tasks..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
         <button type="button" className="repos-refresh-btn" onClick={fetchRepos} disabled={isLoading}>
           {isLoading ? "Loading..." : "Refresh"}
         </button>
@@ -101,7 +109,11 @@ export const ReposPrimaryView = () => {
         {repos.length === 0 && !isLoading && (
           <p className="repos-empty">No repos connected. Connect repos via Jules to see them here.</p>
         )}
-        {repos.map((repo) => {
+        {repos.filter((r) => {
+          if (!search) return true;
+          const q = search.toLowerCase();
+          return r.name.toLowerCase().includes(q) || r.fullName.toLowerCase().includes(q) || r.tasks.some(t => t.prompt.toLowerCase().includes(q));
+        }).map((repo) => {
           const h = hashStr(repo.name);
           const color = CARD_COLORS[h % CARD_COLORS.length]!;
           const anim = CARD_ANIMATIONS[h % CARD_ANIMATIONS.length]!;

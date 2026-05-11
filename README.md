@@ -57,28 +57,14 @@ That's it. `jat` starts the backend (FastAPI on `http://localhost:8000`) and the
 
 Create a `.env` file at the repo root (copy from `.env.example`) with at minimum:
 ```
-JULES_API_KEY=your_jules_key
 GITHUB_TOKEN=your_github_pat
 ```
 
-The dashboard's APIs page can manage these at runtime too, but the backend reads them from `.env` on startup.
+Jules API keys are managed through the dashboard's APIs page (stored encrypted in the database), not in `.env`.
 
 ## What It Does
 
 JAT-AI treats Jules sessions as nodes in a workflow tree. A parent task can spawn child tasks that run in parallel across different Jules accounts. Children share context through a central Supabase store. When a child finishes and creates a PR, the orchestrator can automatically merge it after CI passes. Other agents waiting on that result get notified and continue their work.
-
-## Architecture
-
-```
-Workflow Definition (JSON)
-    -> Workflow Engine (validates DAG, schedules tasks)
-        -> Agent Coordinator (resolves dependencies, injects context)
-            -> Account Pool (picks best Jules account by capacity/load)
-                -> Jules Client (creates session, polls activities, sends messages)
-                    -> Supabase (stores state, activities, context)
-        -> Auto-Merge (waits for CI, merges PRs)
-        -> MCP Server (exposes tools to external AI agents)
-```
 
 ## CLI Usage
 
@@ -220,7 +206,6 @@ examples/
 
 2. Configure `.env`:
    ```
-   JULES_API_KEY=your_key
    GITHUB_TOKEN=your_token
    SUPABASE_URL=your_url
    SUPABASE_KEY=your_key

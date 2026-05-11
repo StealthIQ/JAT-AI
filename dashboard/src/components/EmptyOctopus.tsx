@@ -668,7 +668,7 @@ export const OctopusGlyph = ({
       (getComputedStyle(document.documentElement).getPropertyValue("--accent-primary").trim() ||
         "#7c3aed");
 
-    const head = HEADS[expression];
+    const head = HEADS[expression] || HEADS.normal;
 
     const drawFrame = (frame: SpriteFrame, zzzPhase: number) => {
       drawSprite(ctx, accentColor, frame, head, scale, topPad);

@@ -19,21 +19,28 @@ def build_session_prompt(
     concurrent_limit: int = 60,
     account_name: str = "default",
 ) -> str:
-    rules = _load_template("rules.xml")
-    gates = _load_template("gates.xml")
-    anti_patterns = _load_template("anti_patterns.xml")
-    environment = _load_template("environment.xml")
+    from core.config_loader import load_config, get_prompt_settings
+    flags = get_prompt_settings(load_config())
 
-    environment = environment.replace("{plan_tier}", plan_tier)
-    environment = environment.replace("{daily_used}", str(daily_used))
-    environment = environment.replace("{daily_limit}", str(daily_limit))
-    environment = environment.replace("{concurrent_used}", str(concurrent_used))
-    environment = environment.replace("{concurrent_limit}", str(concurrent_limit))
-    environment = environment.replace("{account_name}", account_name)
+    sections = []
 
-    sections = [rules, gates, anti_patterns, environment]
+    if flags.get("inject_rules", True):
+        sections.append(_load_template("rules.xml"))
+    if flags.get("inject_gates", True):
+        sections.append(_load_template("gates.xml"))
+    if flags.get("inject_anti_patterns", True):
+        sections.append(_load_template("anti_patterns.xml"))
+    if flags.get("inject_environment", True):
+        environment = _load_template("environment.xml")
+        environment = environment.replace("{plan_tier}", plan_tier)
+        environment = environment.replace("{daily_used}", str(daily_used))
+        environment = environment.replace("{daily_limit}", str(daily_limit))
+        environment = environment.replace("{concurrent_used}", str(concurrent_used))
+        environment = environment.replace("{concurrent_limit}", str(concurrent_limit))
+        environment = environment.replace("{account_name}", account_name)
+        sections.append(environment)
 
-    if dependency_context:
+    if flags.get("inject_context", True) and dependency_context:
         context_template = _load_template("context.xml")
         context_body = _format_dependency_context(dependency_context)
         sections.append(context_template.replace("{dependency_context}", context_body))

@@ -26,12 +26,21 @@ settings = load_settings()
 async def _track_task(task: AgentTask, plan: ExecutionPlan, status: str, session_id: str | None = None):
     try:
         existing = await db.select("agent_tasks", {
-            "session_id": session_id or "",
             "repo_owner": plan.repo_owner,
             "repo_name": plan.repo_name,
         })
-        if existing:
-            await db.update("agent_tasks", {"status": status}, {"id": existing[0]["id"]})
+        # Match by prompt text prefix to find the right row for this specific task
+        match = None
+        for r in existing:
+            if r.get("prompt", "")[:100] == task.description[:100]:
+                match = r
+                break
+
+        if match:
+            updates = {"status": status}
+            if session_id:
+                updates["session_id"] = session_id
+            await db.update("agent_tasks", updates, {"id": match["id"]})
         else:
             await db.insert("agent_tasks", {
                 "prompt": task.description[:500],
@@ -40,19 +49,6 @@ async def _track_task(task: AgentTask, plan: ExecutionPlan, status: str, session
                 "status": status,
                 "session_id": session_id or "",
             })
-    except Exception:
-        pass
-
-
-async def _untrack_task(task: AgentTask, plan: ExecutionPlan):
-    try:
-        rows = await db.select("agent_tasks", {
-            "repo_owner": plan.repo_owner,
-            "repo_name": plan.repo_name,
-        })
-        for r in rows:
-            if r.get("prompt", "")[:100] == task.description[:100] and r.get("session_id", "") == "":
-                await db.delete("agent_tasks", {"id": r["id"]})
     except Exception:
         pass
 
@@ -73,6 +69,49 @@ async def _resolve_ai_ctx(provider_type: str, model: str) -> dict:
     if not key:
         return {}
     return {"key": key, "provider": provider_type, "model": model}
+
+
+_EXEC_CTX_KEY = "execution_context"
+
+
+async def _persist_execution_context(plan: ExecutionPlan, provider_type: str, model: str):
+    """Save enough info to resume pending tasks after a crash."""
+    import json
+    ctx = json.dumps({
+        "repo_owner": plan.repo_owner,
+        "repo_name": plan.repo_name,
+        "execution_mode": plan.execution_mode,
+        "provider_type": provider_type,
+        "model": model,
+        "max_retries": plan.max_retries,
+        "timeout_minutes": plan.timeout_minutes,
+    })
+    try:
+        existing = await db.select("app_settings", filters={"key": _EXEC_CTX_KEY})
+        if existing:
+            await db.update("app_settings", {"value": ctx}, {"key": _EXEC_CTX_KEY})
+        else:
+            await db.insert("app_settings", {"key": _EXEC_CTX_KEY, "value": ctx})
+    except Exception:
+        pass
+
+
+async def _clear_execution_context():
+    try:
+        await db.delete("app_settings", {"key": _EXEC_CTX_KEY})
+    except Exception:
+        pass
+
+
+async def _load_execution_context() -> dict | None:
+    import json
+    try:
+        rows = await db.select("app_settings", filters={"key": _EXEC_CTX_KEY})
+        if rows:
+            return json.loads(rows[0].get("value", "{}"))
+    except Exception:
+        pass
+    return None
 
 
 class ExecuteRequest(BaseModel):
@@ -146,7 +185,7 @@ async def _run_task_once(task: AgentTask, plan: ExecutionPlan, base_sha: str, ju
             plan.repo_owner, plan.repo_name, task.branch_name, base_sha, token
         )
         if not branch_created:
-            await _untrack_task(task, plan)
+            await _track_task(task, plan, "failed")
             return TaskResult(task_id=task.id, status="failed", error="Branch creation failed")
 
         prompt = await _resolve_prompt(task, plan, token, task_index)
@@ -155,7 +194,7 @@ async def _run_task_once(task: AgentTask, plan: ExecutionPlan, base_sha: str, ju
             branch=task.branch_name, jules_key=jules_key,
         )
         if not session_id:
-            await _untrack_task(task, plan)
+            await _track_task(task, plan, "failed")
             return TaskResult(task_id=task.id, status="failed", error="Session creation failed")
 
         ai = ai_ctx or {}
@@ -274,12 +313,14 @@ async def _execute_parallel(plan: ExecutionPlan, jules_key: str, token: str, ai_
     if not base_sha:
         return [TaskResult(task_id=t.id, status="failed", error="Could not get base SHA") for t in plan.tasks]
 
-    # Stagger to avoid rate limiting
+    from core.config_loader import load_config, get_workflow_settings
+    stagger_delay = get_workflow_settings(load_config()).get("parallel_limit", 2)
+
     tasks = []
     for i, task in enumerate(plan.tasks):
         coro = _run_task(task, plan, base_sha, jules_key, token, i, ai_ctx)
         tasks.append(asyncio.create_task(coro))
-        await asyncio.sleep(2)
+        await asyncio.sleep(stagger_delay)
     return await asyncio.gather(*tasks)
 
 
@@ -326,9 +367,21 @@ async def execute_plan(request: ExecuteRequest):
     except Exception as e:
         raise HTTPException(400, f"Invalid plan: {e}")
 
+    # Apply config.json workflow overrides
+    from core.config_loader import load_config, get_workflow_settings
+    wf_cfg = get_workflow_settings(load_config())
+    if wf_cfg.get("max_retries") is not None:
+        plan.max_retries = wf_cfg["max_retries"]
+
     ai_ctx = await _resolve_ai_ctx(request.provider_type, request.model)
 
-    # Initialize .jules/jdocs on the default branch so agents have shared context
+    # Pre-register all tasks as "pending" so they appear on the canvas immediately
+    for task in plan.tasks:
+        await _track_task(task, plan, "pending")
+
+    # Persist execution context so pending tasks can be auto-resumed after a crash
+    await _persist_execution_context(plan, request.provider_type, request.model)
+
     try:
         from core.jdocs import init_jdocs
         await init_jdocs(plan.repo_owner, plan.repo_name, "main", token)
@@ -343,6 +396,8 @@ async def execute_plan(request: ExecuteRequest):
         results = await _execute_sequential(plan, jules_key, token, ai_ctx)
 
     all_done = all(r.status == "completed" for r in results)
+
+    await _clear_execution_context()
 
     merge_result = None
     if all_done:

@@ -245,10 +245,14 @@ def main() -> None:
 
     settings = load_settings()
     configure_logging(settings.log_level)
-    api_key = getattr(args, "api_key", None) or settings.jules_api_key
+
+    api_key = getattr(args, "api_key", None)
+    if not api_key:
+        from core.plan_executor import get_jules_key
+        api_key = asyncio.run(get_jules_key())
 
     if not api_key:
-        print("JULES_API_KEY is required. Set it in .env or pass --api-key.")
+        print("No Jules API key found. Add one via the dashboard APIs page or pass --api-key.")
         sys.exit(1)
 
     if args.command == "run":

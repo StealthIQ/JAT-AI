@@ -17,8 +17,13 @@ mcp = FastMCP("JAT MCP Server")
 
 
 def _get_jules():
+    import asyncio
     from clients.jules import JulesClient
-    return JulesClient(os.environ["JULES_API_KEY"])
+    from core.plan_executor import get_jules_key
+    key = asyncio.run(get_jules_key())
+    if not key:
+        raise RuntimeError("No Jules API key configured. Add one via the dashboard APIs page.")
+    return JulesClient(key)
 
 
 def _get_github():

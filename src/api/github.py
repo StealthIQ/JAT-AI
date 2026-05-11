@@ -49,6 +49,8 @@ async def _fetch_commits(client: httpx.AsyncClient, owner: str, headers: dict, s
             break
         if res.status_code != 200:
             break
+        if len(res.content) > 5_000_000:
+            break
         items = res.json().get("items", [])
         if not items:
             break
@@ -62,7 +64,7 @@ async def _fetch_commits(client: httpx.AsyncClient, owner: str, headers: dict, s
                 "authorName": author.get("name", ""),
                 "authorEmail": author.get("email", ""),
                 "authoredAt": author.get("date", ""),
-                "body": commit_data.get("message", ""),
+                "body": commit_data.get("message", "").split("\n")[0],
                 "url": c.get("html_url", ""),
                 "repo": c.get("repository", {}).get("full_name", ""),
                 "filesChanged": 0,
