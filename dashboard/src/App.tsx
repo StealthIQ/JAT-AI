@@ -99,6 +99,9 @@ export const App = () => {
     runWorkspaceSetupStep,
   } = useWorkspaceSetup();
 
+  // The UI state endpoint returns static defaults — mark as hydrated immediately
+  useEffect(() => { setIsUiStateHydrated(true); }, [setIsUiStateHydrated]);
+
   const [runningWorkspaceSetupStepId, setRunningWorkspaceSetupStepId] = useState<
     | "initialize-workspace"
     | "ensure-gitignore"
