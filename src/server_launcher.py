@@ -4,6 +4,7 @@ import os
 import subprocess
 import sys
 import time
+import shutil
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -39,6 +40,10 @@ def _start_frontend(dashboard_dir: Path, port: str) -> subprocess.Popen | None:
     if not dashboard_dir.exists() or not (dashboard_dir / "package.json").exists():
         return None
 
+    if shutil.which("pnpm") is None:
+        print("[ERROR] pnpm is required to start the dashboard. Install pnpm and try again.")
+        return None
+
     if not (dashboard_dir / "node_modules").exists():
         print("[SETUP] Installing dashboard dependencies...")
         subprocess.run(["pnpm", "install"], cwd=str(dashboard_dir))
@@ -65,6 +70,7 @@ def _start_frontend(dashboard_dir: Path, port: str) -> subprocess.Popen | None:
 def main():
     root = Path(__file__).resolve().parent.parent
     env_file = root / ".env"
+    dashboard_dir = root / "dashboard"
 
     if not env_file.exists():
         print("[ERROR] .env file not found. Copy .env.example and fill in your keys.")
@@ -80,7 +86,12 @@ def main():
     print()
 
     backend = _start_backend(root, root / "src", port)
-    frontend = _start_frontend(root / "dashboard", frontend_port)
+    frontend = _start_frontend(dashboard_dir, frontend_port)
+
+    if dashboard_dir.exists() and (dashboard_dir / "package.json").exists() and frontend is None:
+        print("[ERROR] Frontend failed to start.")
+        backend.terminate()
+        sys.exit(1)
 
     url = f"http://localhost:{frontend_port}" if frontend else f"http://localhost:{port}"
     print()
