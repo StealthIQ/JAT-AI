@@ -660,13 +660,13 @@
 
 /* --- Create New button row --- */
 
-.settings-create-row {
+.settings-input-row {
   display: flex;
   gap: 0.4rem;
   align-items: stretch;
 }
 
-.settings-create-row .settings-field-input {
+.settings-input-row .settings-field-input {
   flex: 1;
   min-width: 0;
 }

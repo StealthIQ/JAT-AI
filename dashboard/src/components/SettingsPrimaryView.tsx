@@ -56,18 +56,27 @@ const KEY_CREATION_GUIDES: Record<string, CreateKeyGuide> = {
     ],
     note: "Classic tokens support org SSO. If your org enforces SSO, you'll need to enable it after creation.",
   },
-  supabase: {
-    keyLabel: "Supabase",
+  supabase_url: {
+    keyLabel: "Supabase Project URL",
     url: "https://supabase.com/dashboard/project/_/settings/api",
     steps: [
       'Go to your Supabase project dashboard',
       'Navigate to Settings > API in the left sidebar',
-      'Under "Project URL", copy the URL and paste it in the Supabase URL field',
-      'Under "Project API keys", find the "service_role" key (NOT the anon/public key)',
-      'Copy the service_role key and paste it in the Supabase Key field',
-      'Keep both the anon key for client-side use and service_role for admin operations',
+      'Under "Project URL", copy the URL shown at the top of the page',
+      'Paste that value into the Supabase URL field in JAT-AI',
     ],
-    note: "Never expose the service_role key in client-side code. It has full admin access to your database.",
+  },
+  supabase_key: {
+    keyLabel: "Supabase Service Role Key",
+    url: "https://supabase.com/dashboard/project/_/settings/api",
+    steps: [
+      'Go to your Supabase project dashboard',
+      'Navigate to Settings > API in the left sidebar',
+      'Under "Project API keys", find the "service_role" key',
+      'Copy the service_role key value',
+      'Paste that value into the Supabase Key field in JAT-AI',
+    ],
+    note: "Use the service_role key here, not the anon/public key. The service_role key has full admin access and must stay server-side.",
   },
 };
 
@@ -171,8 +180,8 @@ export const SettingsPrimaryView = (_props: SettingsPrimaryViewProps) => {
         <div className="settings-fields">
           <SettingsFieldWithStatus label="GitHub Classic Token (ghp_...)" value={settings.github_token} onChange={(v) => updateField("github_token", v)} placeholder="ghp_xxxxxxxxxxxx" type="password" disabled={!editing} loaded={loaded} status={keyStatus.github_token} onErrorClick={(err) => setErrorPopup(err)} onCreateNew={() => setCreateKeyPopup("github_token")} />
           <SettingsFieldWithStatus label="GitHub Fine-Grained Token (github_pat_...)" value={settings.github_fg_token} onChange={(v) => updateField("github_fg_token", v)} placeholder="github_pat_xxxxxxxxxxxx" type="password" disabled={!editing} loaded={loaded} status={keyStatus.github_fg_token} onErrorClick={(err) => setErrorPopup(err)} onCreateNew={() => setCreateKeyPopup("github_fg_token")} />
-          <SettingsFieldWithStatus label="Supabase URL" value={settings.supabase_url} onChange={(v) => updateField("supabase_url", v)} placeholder="https://xxxxx.supabase.co" disabled={!editing} loaded={loaded} status={keyStatus.supabase} onErrorClick={(err) => setErrorPopup(err)} onCreateNew={() => setCreateKeyPopup("supabase")} />
-          <SettingsField label="Supabase Key (service_role)" value={settings.supabase_key} onChange={(v) => updateField("supabase_key", v)} placeholder="eyJhbGciOi..." type="password" disabled={!editing} loaded={loaded} />
+          <SettingsFieldWithStatus label="Supabase URL" value={settings.supabase_url} onChange={(v) => updateField("supabase_url", v)} placeholder="https://xxxxx.supabase.co" disabled={!editing} loaded={loaded} status={keyStatus.supabase_url} onErrorClick={(err) => setErrorPopup(err)} onCreateNew={() => setCreateKeyPopup("supabase_url")} />
+          <SettingsFieldWithStatus label="Supabase Key (service_role)" value={settings.supabase_key} onChange={(v) => updateField("supabase_key", v)} placeholder="eyJhbGciOi..." type="password" disabled={!editing} loaded={loaded} status={keyStatus.supabase_key} onErrorClick={(err) => setErrorPopup(err)} onCreateNew={() => setCreateKeyPopup("supabase_key")} />
         </div>
       </section>
 
@@ -431,20 +440,7 @@ const SettingsFieldWithStatus = ({ label, value, onChange, placeholder, type = "
       {status?.status === "error" && <button type="button" className="settings-status-badge settings-status-badge--error" onClick={() => onErrorClick(status.error ?? "Unknown error")}>Error</button>}
       {status?.status === "not_configured" && <span className="settings-status-badge settings-status-badge--none">Not set</span>}
     </div>
-    {(status?.status === "missing" || status?.status === "not_configured" || (!value && loaded)) && onCreateNew ? (
-      <div className="settings-create-row">
-        <input
-          className="settings-field-input"
-          type={type}
-          value=""
-          placeholder={placeholder}
-          disabled
-        />
-        <button type="button" className="settings-create-btn" onClick={onCreateNew}>
-          + Create New
-        </button>
-      </div>
-    ) : (
+    <div className="settings-input-row">
       <input
         className="settings-field-input"
         type={type}
@@ -453,6 +449,11 @@ const SettingsFieldWithStatus = ({ label, value, onChange, placeholder, type = "
         placeholder={placeholder}
         disabled={disabled || !loaded}
       />
-    )}
+      {(status?.status === "missing" || status?.status === "not_configured" || (!value && loaded)) && onCreateNew ? (
+        <button type="button" className="settings-create-btn" onClick={onCreateNew}>
+          + Create New
+        </button>
+      ) : null}
+    </div>
   </div>
 );
