@@ -436,9 +436,10 @@ const SettingsFieldWithStatus = ({ label, value, onChange, placeholder, type = "
         <input
           className="settings-field-input"
           type={type}
-          value=""
+          value={loaded ? value : ""}
+          onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          disabled
+          disabled={disabled || !loaded}
         />
         <button type="button" className="settings-create-btn" onClick={onCreateNew}>
           + Create New
