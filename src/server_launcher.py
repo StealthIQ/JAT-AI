@@ -14,6 +14,7 @@ def _wait_for_port(port: str, timeout: int = 30):
         time.sleep(1)
         try:
             import httpx
+
             r = httpx.get(f"http://localhost:{port}/api/setup", timeout=2)
             if r.status_code == 200:
                 return True
@@ -40,18 +41,18 @@ def _start_frontend(dashboard_dir: Path, port: str) -> subprocess.Popen | None:
 
     if not (dashboard_dir / "node_modules").exists():
         print("[SETUP] Installing dashboard dependencies...")
-        subprocess.run(["npm", "install", "--silent"], cwd=str(dashboard_dir), shell=True)
+        subprocess.run(["pnpm", "install"], cwd=str(dashboard_dir))
 
     print(f"[FRONTEND] Starting Vite on port {port}...")
     proc = subprocess.Popen(
-        ["npx", "vite", "--port", port],
+        ["pnpm", "exec", "vite", "--port", port],
         cwd=str(dashboard_dir),
-        shell=True,
     )
     for _ in range(15):
         time.sleep(1)
         try:
             import httpx
+
             r = httpx.get(f"http://localhost:{port}", timeout=2)
             if r.status_code == 200:
                 break
@@ -90,6 +91,7 @@ def main():
     print()
 
     import webbrowser
+
     webbrowser.open(url)
 
     try:
